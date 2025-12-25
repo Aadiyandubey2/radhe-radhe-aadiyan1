@@ -11,9 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { FileText, Printer, Download, Search, Filter, Receipt, User, IndianRupee } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { FileText, Printer, Download, Search, Receipt, User, IndianRupee, MessageCircle, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -23,6 +21,7 @@ interface ClientBill {
   companyName?: string;
   gstNumber?: string;
   address?: string;
+  phone?: string;
   trips: any[];
   totalFare: number;
   totalPaid: number;
@@ -62,6 +61,7 @@ export default function Billing() {
       companyName: client.company_name,
       gstNumber: client.gst_number,
       address: client.address,
+      phone: client.phone,
       trips: clientTrips,
       totalFare,
       totalPaid,
@@ -85,7 +85,7 @@ export default function Billing() {
 
   const generateBillHTML = (bill: ClientBill) => {
     const today = format(new Date(), "dd/MM/yyyy");
-    const billNo = `BILL-${Date.now().toString(36).toUpperCase()}`;
+    const billNo = `RRT-${Date.now().toString(36).toUpperCase()}`;
     
     return `
 <!DOCTYPE html>
@@ -96,29 +96,32 @@ export default function Billing() {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-    .header h1 { color: #2563eb; font-size: 28px; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #8B0000; padding-bottom: 20px; }
+    .header h1 { color: #8B0000; font-size: 32px; font-weight: bold; }
+    .header .tagline { color: #DAA520; font-size: 16px; margin-top: 5px; font-style: italic; }
     .header p { color: #666; margin-top: 5px; }
     .info-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
     .info-box { flex: 1; }
-    .info-box h3 { font-size: 14px; color: #666; margin-bottom: 5px; }
+    .info-box h3 { font-size: 14px; color: #8B0000; margin-bottom: 5px; font-weight: 600; }
     .info-box p { font-size: 14px; }
     table { width: 100%; border-collapse: collapse; margin: 20px 0; }
     th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background: #f3f4f6; font-weight: 600; }
+    th { background: linear-gradient(135deg, #8B0000, #A52A2A); color: white; font-weight: 600; }
     .text-right { text-align: right; }
-    .total-row { background: #f9fafb; font-weight: 600; }
-    .summary { margin-top: 30px; border-top: 2px solid #333; padding-top: 20px; }
+    .total-row { background: #FFF8DC; font-weight: 600; }
+    .summary { margin-top: 30px; border-top: 3px solid #8B0000; padding-top: 20px; }
     .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-    .summary-row.total { font-size: 18px; font-weight: 700; color: #2563eb; border-bottom: none; margin-top: 10px; }
-    .footer { margin-top: 50px; text-align: center; color: #666; font-size: 12px; }
+    .summary-row.total { font-size: 18px; font-weight: 700; color: #8B0000; border-bottom: none; margin-top: 10px; }
+    .footer { margin-top: 50px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #ddd; padding-top: 20px; }
+    .footer .company { color: #8B0000; font-weight: 600; }
     @media print { body { padding: 20px; } }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>FleetPro Transport</h1>
-    <p>Transport & Logistics Management</p>
+    <h1>🙏 राधे राधे ट्रांसपोर्ट सर्विस</h1>
+    <p class="tagline">Radhe Radhe Transport Service</p>
+    <p>Trusted Transport & Logistics / विश्वसनीय परिवहन सेवा</p>
   </div>
   
   <div class="info-row">
@@ -128,11 +131,12 @@ export default function Billing() {
       ${bill.companyName ? `<p>${bill.companyName}</p>` : ""}
       ${bill.gstNumber ? `<p>GST: ${bill.gstNumber}</p>` : ""}
       ${bill.address ? `<p>${bill.address}</p>` : ""}
+      ${bill.phone ? `<p>Phone: ${bill.phone}</p>` : ""}
     </div>
     <div class="info-box" style="text-align: right;">
       <h3>बिल विवरण / Bill Details:</h3>
       <p><strong>Bill No:</strong> ${billNo}</p>
-      <p><strong>Date:</strong> ${today}</p>
+      <p><strong>Date / दिनांक:</strong> ${today}</p>
     </div>
   </div>
 
@@ -179,11 +183,71 @@ export default function Billing() {
   </div>
 
   <div class="footer">
+    <p class="company">🙏 राधे राधे ट्रांसपोर्ट सर्विस - Radhe Radhe Transport Service</p>
     <p>यह एक कंप्यूटर जनित बिल है / This is a computer generated bill</p>
-    <p>Generated by FleetPro Transport Management System</p>
   </div>
 </body>
 </html>`;
+  };
+
+  const generateBillText = (bill: ClientBill) => {
+    const today = format(new Date(), "dd/MM/yyyy");
+    const billNo = `RRT-${Date.now().toString(36).toUpperCase()}`;
+    
+    let text = `🙏 *राधे राधे ट्रांसपोर्ट सर्विस*\n`;
+    text += `*Radhe Radhe Transport Service*\n`;
+    text += `━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `📄 *Bill No:* ${billNo}\n`;
+    text += `📅 *Date:* ${today}\n\n`;
+    text += `👤 *To:* ${bill.clientName}\n`;
+    if (bill.companyName) text += `🏢 ${bill.companyName}\n`;
+    text += `\n━━━━━━━━━━━━━━━━━━\n`;
+    text += `*यात्रा विवरण / Trip Details:*\n\n`;
+    
+    bill.trips.forEach((t, i) => {
+      text += `${i + 1}. ${t.trip_number}\n`;
+      text += `   📍 ${t.pickup_location} → ${t.drop_location}\n`;
+      text += `   💰 ₹${(t.fare_amount || 0).toLocaleString("en-IN")}\n\n`;
+    });
+    
+    text += `━━━━━━━━━━━━━━━━━━\n`;
+    text += `*कुल किराया / Total:* ₹${bill.totalFare.toLocaleString("en-IN")}\n`;
+    text += `*भुगतान / Paid:* ₹${bill.totalPaid.toLocaleString("en-IN")}\n`;
+    text += `*बकाया / Balance:* ₹${bill.balance.toLocaleString("en-IN")}\n`;
+    text += `━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `🙏 धन्यवाद / Thank You!`;
+    
+    return text;
+  };
+
+  const shareViaWhatsApp = (bill: ClientBill) => {
+    const text = generateBillText(bill);
+    const phone = bill.phone?.replace(/[^0-9]/g, "") || "";
+    const encodedText = encodeURIComponent(text);
+    
+    if (phone) {
+      // If phone number exists, open WhatsApp with that number
+      const whatsappUrl = `https://wa.me/91${phone}?text=${encodedText}`;
+      window.open(whatsappUrl, "_blank");
+    } else {
+      // Open WhatsApp without a specific number (user can choose)
+      const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+      window.open(whatsappUrl, "_blank");
+    }
+    toast.success("Opening WhatsApp... / व्हाट्सएप खोल रहे हैं...");
+  };
+
+  const shareViaSMS = (bill: ClientBill) => {
+    const text = generateBillText(bill);
+    const phone = bill.phone?.replace(/[^0-9]/g, "") || "";
+    const encodedText = encodeURIComponent(text);
+    
+    if (phone) {
+      window.location.href = `sms:${phone}?body=${encodedText}`;
+    } else {
+      window.location.href = `sms:?body=${encodedText}`;
+    }
+    toast.success("Opening SMS... / एसएमएस खोल रहे हैं...");
   };
 
   const printBill = (bill: ClientBill) => {
@@ -213,7 +277,7 @@ export default function Billing() {
     a.download = `Bill_${bill.clientName.replace(/\s+/g, "_")}_${format(new Date(), "yyyyMMdd")}.html`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Bill downloaded successfully");
+    toast.success("Bill downloaded successfully / बिल डाउनलोड हो गया");
   };
 
   // Summary stats
@@ -354,19 +418,39 @@ export default function Billing() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1 flex-wrap">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setViewBill(bill)}
+                          title="View Bill"
                         >
                           <FileText className="w-4 h-4" />
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => shareViaWhatsApp(bill)}
+                          className="bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-600"
+                          title="Share via WhatsApp"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => shareViaSMS(bill)}
+                          className="bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-600"
+                          title="Share via SMS"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => printBill(bill)}
                           disabled={generating === bill.clientId}
+                          title="Print Bill"
                         >
                           <Printer className="w-4 h-4" />
                         </Button>
@@ -374,6 +458,7 @@ export default function Billing() {
                           size="sm"
                           variant="default"
                           onClick={() => downloadBill(bill)}
+                          title="Download Bill"
                         >
                           <Download className="w-4 h-4" />
                         </Button>
@@ -447,7 +532,21 @@ export default function Billing() {
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-end flex-wrap">
+                <Button 
+                  variant="outline" 
+                  onClick={() => shareViaWhatsApp(viewBill)}
+                  className="bg-green-500/10 border-green-500/30 hover:bg-green-500/20 text-green-600"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" /> WhatsApp
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => shareViaSMS(viewBill)}
+                  className="bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-600"
+                >
+                  <Phone className="w-4 h-4 mr-2" /> SMS
+                </Button>
                 <Button variant="outline" onClick={() => printBill(viewBill)}>
                   <Printer className="w-4 h-4 mr-2" /> Print
                 </Button>

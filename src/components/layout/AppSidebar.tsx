@@ -48,15 +48,15 @@ export function AppSidebar() {
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
         {!collapsed && (
           <div className="flex items-center gap-3">
-            <img src={logoImg} alt="FleetPro" className="w-10 h-10 rounded-xl object-cover" />
+            <img src={logoImg} alt="Radhe Radhe Transport" className="w-10 h-10 rounded-xl object-cover" />
             <div>
-              <h1 className="font-display font-bold text-sidebar-foreground">FleetPro</h1>
-              <p className="text-xs text-sidebar-foreground/60">Transport Management</p>
+              <h1 className="font-display font-bold text-sidebar-foreground text-sm leading-tight">राधे राधे</h1>
+              <p className="text-xs text-sidebar-foreground/60">Transport Service</p>
             </div>
           </div>
         )}
         {collapsed && (
-          <img src={logoImg} alt="FleetPro" className="w-10 h-10 mx-auto rounded-xl object-cover" />
+          <img src={logoImg} alt="Radhe Radhe" className="w-10 h-10 mx-auto rounded-xl object-cover" />
         )}
       </div>
 
