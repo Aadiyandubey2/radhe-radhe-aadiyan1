@@ -1,5 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from "@/hooks/useVehicles";
+import { useCategories } from "@/hooks/useCategories";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -12,6 +13,9 @@ import { useState } from "react";
 
 export default function Vehicles() {
   const { data: vehicles, isLoading } = useVehicles();
+  const { data: vehicleTypeCategories } = useCategories("vehicle_type");
+  const { data: fuelTypeCategories } = useCategories("fuel_type");
+
   const createVehicle = useCreateVehicle();
   const updateVehicle = useUpdateVehicle();
   const deleteVehicle = useDeleteVehicle();
@@ -61,6 +65,53 @@ export default function Vehicles() {
     setSelectedVehicle(null);
   };
 
+  const normalizeKey = (name: string) =>
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+
+  const mapVehicleTypeValue = (name: string) => {
+    const n = normalizeKey(name);
+    if (n.includes("mini") && n.includes("truck")) return "mini_truck";
+    if (n.includes("truck")) return "truck";
+    if (n.includes("trailer")) return "trailer";
+    if (n.includes("tanker")) return "tanker";
+    if (n.includes("container")) return "container";
+    if (n.includes("car")) return "car";
+    return n;
+  };
+
+  const mapFuelTypeValue = (name: string) => {
+    const n = normalizeKey(name);
+    if (n.includes("diesel")) return "diesel";
+    if (n.includes("petrol")) return "petrol";
+    if (n.includes("cng")) return "cng";
+    if (n.includes("electric")) return "electric";
+    return n;
+  };
+
+  const vehicleTypeOptions = (vehicleTypeCategories?.length ? vehicleTypeCategories : [
+    { id: "static-truck", name: "Truck" },
+    { id: "static-trailer", name: "Trailer" },
+    { id: "static-tanker", name: "Tanker" },
+    { id: "static-container", name: "Container" },
+  ]).map((c: any) => ({ value: mapVehicleTypeValue(c.name), label: c.name }));
+
+  const fuelTypeOptions = (fuelTypeCategories?.length ? fuelTypeCategories : [
+    { id: "static-diesel", name: "Diesel" },
+    { id: "static-petrol", name: "Petrol" },
+    { id: "static-cng", name: "CNG" },
+    { id: "static-electric", name: "Electric" },
+  ]).map((c: any) => ({ value: mapFuelTypeValue(c.name), label: c.name }));
+
+  const vehicleTypeLabel = (value?: string) =>
+    vehicleTypeOptions.find((o) => o.value === value)?.label || (value ? value.replace(/_/g, " ") : "");
+
+  const fuelTypeLabel = (value?: string) =>
+    fuelTypeOptions.find((o) => o.value === value)?.label || (value ? value.replace(/_/g, " ") : "");
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active": return "bg-success/10 text-success";
@@ -77,10 +128,9 @@ export default function Vehicles() {
           <Select name="vehicle_type" defaultValue={vehicle?.vehicle_type || ""} required>
             <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="truck">Truck</SelectItem>
-              <SelectItem value="trailer">Trailer</SelectItem>
-              <SelectItem value="tanker">Tanker</SelectItem>
-              <SelectItem value="container">Container</SelectItem>
+              {vehicleTypeOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -91,10 +141,9 @@ export default function Vehicles() {
           <Select name="fuel_type" defaultValue={vehicle?.fuel_type || "diesel"}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="diesel">Diesel</SelectItem>
-              <SelectItem value="petrol">Petrol</SelectItem>
-              <SelectItem value="cng">CNG</SelectItem>
-              <SelectItem value="electric">Electric</SelectItem>
+              {fuelTypeOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -161,7 +210,7 @@ export default function Vehicles() {
                     </div>
                     <div>
                       <h3 className="font-semibold">{vehicle.vehicle_number}</h3>
-                      <p className="text-sm text-muted-foreground capitalize">{vehicle.vehicle_type}</p>
+                      <p className="text-sm text-muted-foreground capitalize">{vehicleTypeLabel(vehicle.vehicle_type)}</p>
                     </div>
                   </div>
                   <Badge className={getStatusColor(vehicle.status)}>{vehicle.status}</Badge>
@@ -170,7 +219,7 @@ export default function Vehicles() {
                   {vehicle.make && <p><span className="text-muted-foreground">Make:</span> {vehicle.make} {vehicle.model}</p>}
                   {vehicle.capacity && <p><span className="text-muted-foreground">Capacity:</span> {vehicle.capacity}</p>}
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Fuel className="w-4 h-4" /> {vehicle.fuel_type}
+                    <Fuel className="w-4 h-4" /> {fuelTypeLabel(vehicle.fuel_type)}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4 pt-4 border-t">
