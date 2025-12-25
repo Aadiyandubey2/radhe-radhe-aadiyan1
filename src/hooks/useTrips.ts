@@ -51,6 +51,54 @@ export function useTrips() {
   });
 }
 
+export function useTripWithFinancials(tripId: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["trip-financials", tripId, user?.id],
+    queryFn: async () => {
+      // Fetch trip
+      const { data: trip, error: tripError } = await supabase
+        .from("trips")
+        .select("*, vehicles(vehicle_number), drivers(name), clients(name, company_name)")
+        .eq("id", tripId)
+        .single();
+
+      if (tripError) throw tripError;
+
+      // Fetch expenses for this trip
+      const { data: expenses, error: expensesError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("trip_id", tripId);
+
+      if (expensesError) throw expensesError;
+
+      // Fetch income for this trip
+      const { data: income, error: incomeError } = await supabase
+        .from("income")
+        .select("*")
+        .eq("trip_id", tripId);
+
+      if (incomeError) throw incomeError;
+
+      const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const totalIncome = income?.reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+      const profit = totalIncome - totalExpenses;
+
+      return {
+        ...trip,
+        expenses,
+        income,
+        totalExpenses,
+        totalIncome,
+        profit,
+      };
+    },
+    enabled: !!user && !!tripId,
+  });
+}
+
 export function useCreateTrip() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

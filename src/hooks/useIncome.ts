@@ -19,17 +19,22 @@ export interface Income {
   clients?: { name: string; company_name: string | null } | null;
 }
 
-export function useIncome() {
+export function useIncome(tripId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["income", user?.id],
+    queryKey: ["income", user?.id, tripId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("income")
         .select("*, trips(trip_number), clients(name, company_name)")
         .order("payment_date", { ascending: false });
 
+      if (tripId) {
+        query = query.eq("trip_id", tripId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Income[];
     },
