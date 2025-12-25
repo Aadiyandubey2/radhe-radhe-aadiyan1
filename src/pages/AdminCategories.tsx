@@ -29,9 +29,10 @@ export default function AdminCategories() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({ name: "", description: "" });
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const { user } = useAuth();
-  const { data: categories, isLoading } = useCategories(activeTab);
+  const { data: categories, isLoading, refetch } = useCategories(activeTab);
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
   const deleteCategory = useDeleteCategory();
@@ -42,23 +43,27 @@ export default function AdminCategories() {
       return;
     }
 
-    if (editingCategory) {
-      await updateCategory.mutateAsync({
-        id: editingCategory.id,
-        name: formData.name,
-        description: formData.description || null,
-      });
-    } else {
-      await createCategory.mutateAsync({
-        type: activeTab,
-        name: formData.name,
-        description: formData.description || undefined,
-      });
-    }
+    try {
+      if (editingCategory) {
+        await updateCategory.mutateAsync({
+          id: editingCategory.id,
+          name: formData.name,
+          description: formData.description || null,
+        });
+      } else {
+        await createCategory.mutateAsync({
+          type: activeTab,
+          name: formData.name,
+          description: formData.description || undefined,
+        });
+      }
 
-    setFormData({ name: "", description: "" });
-    setIsAddOpen(false);
-    setEditingCategory(null);
+      setFormData({ name: "", description: "" });
+      setIsAddOpen(false);
+      setEditingCategory(null);
+    } catch (error) {
+      // Error is already handled by mutation
+    }
   };
 
   const handleEdit = (category: Category) => {
@@ -73,17 +78,37 @@ export default function AdminCategories() {
     }
   };
 
-  const seedDefaults = async () => {
-    const toSeed = defaultCategories.filter((dc) => dc.type === activeTab);
-    for (const cat of toSeed) {
-      try {
-        await supabase.from("categories").insert({ ...cat, user_id: user!.id });
-      } catch (e) {
-        // Ignore duplicates
-      }
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setFormData({ name: "", description: "" });
+      setEditingCategory(null);
     }
-    toast.success("Default categories added");
-    window.location.reload();
+    setIsAddOpen(open);
+  };
+
+  const seedDefaults = async () => {
+    if (!user) return;
+    
+    setIsSeeding(true);
+    const toSeed = defaultCategories.filter((dc) => dc.type === activeTab);
+    let addedCount = 0;
+    
+    for (const cat of toSeed) {
+      const { error } = await supabase
+        .from("categories")
+        .insert({ ...cat, user_id: user.id });
+      
+      if (!error) addedCount++;
+    }
+    
+    await refetch();
+    setIsSeeding(false);
+    
+    if (addedCount > 0) {
+      toast.success(`Added ${addedCount} default categories`);
+    } else {
+      toast.info("All default categories already exist");
+    }
   };
 
   const currentTypeInfo = categoryTypes.find((t) => t.value === activeTab);
@@ -126,10 +151,10 @@ export default function AdminCategories() {
                       <p className="text-sm text-muted-foreground">{type.description}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={seedDefaults}>
-                        Add Defaults
+                      <Button variant="outline" size="sm" onClick={seedDefaults} disabled={isSeeding}>
+                        {isSeeding ? "Adding..." : "Add Defaults"}
                       </Button>
-                      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+                      <Dialog open={isAddOpen} onOpenChange={handleDialogClose}>
                         <DialogTrigger asChild>
                           <Button size="sm" onClick={() => { setEditingCategory(null); setFormData({ name: "", description: "" }); }}>
                             <Plus className="h-4 w-4 mr-2" />
@@ -163,9 +188,9 @@ export default function AdminCategories() {
                             </div>
                           </div>
                           <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                            <Button variant="outline" onClick={() => handleDialogClose(false)}>Cancel</Button>
                             <Button onClick={handleSubmit} disabled={createCategory.isPending || updateCategory.isPending}>
-                              {editingCategory ? "Update" : "Create"}
+                              {createCategory.isPending || updateCategory.isPending ? "Saving..." : editingCategory ? "Update" : "Create"}
                             </Button>
                           </DialogFooter>
                         </DialogContent>
@@ -210,8 +235,8 @@ export default function AdminCategories() {
                   ) : (
                     <div className="text-center py-8 border rounded-lg bg-muted/30">
                       <p className="text-muted-foreground mb-2">No categories found</p>
-                      <Button variant="outline" size="sm" onClick={seedDefaults}>
-                        Add Default {type.label}
+                      <Button variant="outline" size="sm" onClick={seedDefaults} disabled={isSeeding}>
+                        {isSeeding ? "Adding..." : `Add Default ${type.label}`}
                       </Button>
                     </div>
                   )}

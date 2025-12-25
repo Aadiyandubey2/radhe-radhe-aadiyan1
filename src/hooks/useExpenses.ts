@@ -21,17 +21,22 @@ export interface Expense {
   trips?: { trip_number: string } | null;
 }
 
-export function useExpenses() {
+export function useExpenses(tripId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["expenses", user?.id],
+    queryKey: ["expenses", user?.id, tripId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("expenses")
         .select("*, vehicles(vehicle_number), drivers(name), trips(trip_number)")
         .order("expense_date", { ascending: false });
 
+      if (tripId) {
+        query = query.eq("trip_id", tripId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Expense[];
     },
