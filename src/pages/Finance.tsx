@@ -6,15 +6,18 @@ import { useTrips } from "@/hooks/useTrips";
 import { useClients } from "@/hooks/useClients";
 import { useDrivers } from "@/hooks/useDrivers";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Edit, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Wallet, Download } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Plus, Trash2, Edit, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Wallet, Download, Search, Calendar, X, Check } from "lucide-react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 type TransactionType = "expense" | "income";
 
@@ -38,6 +41,12 @@ interface UnifiedTransaction {
   originalData: any;
 }
 
+interface EditingCell {
+  transactionId: string;
+  field: string;
+  value: string;
+}
+
 export default function Finance() {
   const { data: expenses } = useExpenses();
   const { data: income } = useIncome();
@@ -59,6 +68,22 @@ export default function Finance() {
   const [filterType, setFilterType] = useState<"all" | "expense" | "income">("all");
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  
+  // Search and date range filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+  
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingCell && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingCell]);
 
   // Combine expenses and income into unified transactions
   const transactions = useMemo<UnifiedTransaction[]>(() => {
@@ -95,9 +120,33 @@ export default function Finance() {
 
     let combined = [...expenseRows, ...incomeRows];
 
-    // Filter
+    // Filter by type
     if (filterType !== "all") {
       combined = combined.filter((t) => t.type === filterType);
+    }
+
+    // Filter by date range
+    if (dateFrom) {
+      combined = combined.filter((t) => new Date(t.date) >= dateFrom);
+    }
+    if (dateTo) {
+      combined = combined.filter((t) => new Date(t.date) <= dateTo);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      combined = combined.filter((t) =>
+        t.tripNumber?.toLowerCase().includes(q) ||
+        t.vehicleNumber?.toLowerCase().includes(q) ||
+        t.driverName?.toLowerCase().includes(q) ||
+        t.clientName?.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q) ||
+        t.category?.toLowerCase().includes(q) ||
+        t.paymentMethod?.toLowerCase().includes(q) ||
+        t.reference?.toLowerCase().includes(q) ||
+        t.amount.toString().includes(q)
+      );
     }
 
     // Sort
@@ -112,7 +161,7 @@ export default function Finance() {
     });
 
     return combined;
-  }, [expenses, income, filterType, sortField, sortOrder]);
+  }, [expenses, income, filterType, sortField, sortOrder, searchQuery, dateFrom, dateTo]);
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
@@ -120,6 +169,10 @@ export default function Finance() {
   const totalIncome = income?.reduce((s, i) => s + Number(i.amount), 0) || 0;
   const totalExpenses = expenses?.reduce((s, e) => s + Number(e.amount), 0) || 0;
   const netProfit = totalIncome - totalExpenses;
+
+  // Filtered totals
+  const filteredIncome = transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const filteredExpenses = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
   const handleAddNew = (type: TransactionType) => {
     setTransactionType(type);
@@ -184,6 +237,45 @@ export default function Finance() {
     setEditingTransaction(null);
   };
 
+  // Inline edit handlers
+  const startEditing = (transaction: UnifiedTransaction, field: string, currentValue: string) => {
+    setEditingCell({ transactionId: transaction.id, field, value: currentValue });
+  };
+
+  const cancelEditing = () => {
+    setEditingCell(null);
+  };
+
+  const saveInlineEdit = async (transaction: UnifiedTransaction) => {
+    if (!editingCell) return;
+
+    const { field, value } = editingCell;
+
+    if (transaction.type === "expense") {
+      const updateData: any = { id: transaction.id };
+      if (field === "amount") updateData.amount = parseFloat(value) || 0;
+      if (field === "date") updateData.expense_date = value;
+      if (field === "description") updateData.description = value || null;
+      await updateExpense.mutateAsync(updateData);
+    } else {
+      const updateData: any = { id: transaction.id };
+      if (field === "amount") updateData.amount = parseFloat(value) || 0;
+      if (field === "date") updateData.payment_date = value;
+      if (field === "description") updateData.notes = value || null;
+      await updateIncome.mutateAsync(updateData);
+    }
+
+    setEditingCell(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, transaction: UnifiedTransaction) => {
+    if (e.key === "Enter") {
+      saveInlineEdit(transaction);
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
   const exportToCSV = () => {
     const headers = ["Type", "Date", "Amount", "Category/Method", "Trip", "Vehicle", "Driver", "Client", "Description", "Reference"];
     const rows = transactions.map((t) => [
@@ -217,6 +309,52 @@ export default function Finance() {
     }
   };
 
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setFilterType("all");
+  };
+
+  const hasActiveFilters = searchQuery || dateFrom || dateTo || filterType !== "all";
+
+  // Editable cell component
+  const EditableCell = ({ transaction, field, value, displayValue, className = "" }: {
+    transaction: UnifiedTransaction;
+    field: string;
+    value: string;
+    displayValue: React.ReactNode;
+    className?: string;
+  }) => {
+    const isEditing = editingCell?.transactionId === transaction.id && editingCell?.field === field;
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <Input
+            ref={inputRef}
+            type={field === "amount" ? "number" : field === "date" ? "date" : "text"}
+            value={editingCell.value}
+            onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+            onKeyDown={(e) => handleKeyDown(e, transaction)}
+            onBlur={() => saveInlineEdit(transaction)}
+            className="h-7 text-sm py-0 px-1"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={`cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 ${className}`}
+        onDoubleClick={() => startEditing(transaction, field, value)}
+        title="Double-click to edit"
+      >
+        {displayValue}
+      </div>
+    );
+  };
+
   return (
     <AppLayout title="Finance Database" subtitle="All transactions in one place">
       {/* Summary Cards */}
@@ -228,8 +366,12 @@ export default function Finance() {
                 <TrendingUp className="w-5 h-5 text-success" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Income</p>
-                <p className="text-xl font-bold text-success">{formatCurrency(totalIncome)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {hasActiveFilters ? "Filtered Income" : "Total Income"}
+                </p>
+                <p className="text-xl font-bold text-success">
+                  {formatCurrency(hasActiveFilters ? filteredIncome : totalIncome)}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -241,22 +383,28 @@ export default function Finance() {
                 <TrendingDown className="w-5 h-5 text-destructive" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Expenses</p>
-                <p className="text-xl font-bold text-destructive">{formatCurrency(totalExpenses)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {hasActiveFilters ? "Filtered Expenses" : "Total Expenses"}
+                </p>
+                <p className="text-xl font-bold text-destructive">
+                  {formatCurrency(hasActiveFilters ? filteredExpenses : totalExpenses)}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className={`bg-gradient-to-br ${netProfit >= 0 ? "from-success/10 to-success/5 border-success/20" : "from-destructive/10 to-destructive/5 border-destructive/20"}`}>
+        <Card className={`bg-gradient-to-br ${(hasActiveFilters ? filteredIncome - filteredExpenses : netProfit) >= 0 ? "from-success/10 to-success/5 border-success/20" : "from-destructive/10 to-destructive/5 border-destructive/20"}`}>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10">
                 <Wallet className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Net Profit</p>
-                <p className={`text-xl font-bold ${netProfit >= 0 ? "text-success" : "text-destructive"}`}>
-                  {formatCurrency(netProfit)}
+                <p className="text-xs text-muted-foreground">
+                  {hasActiveFilters ? "Filtered Profit" : "Net Profit"}
+                </p>
+                <p className={`text-xl font-bold ${(hasActiveFilters ? filteredIncome - filteredExpenses : netProfit) >= 0 ? "text-success" : "text-destructive"}`}>
+                  {formatCurrency(hasActiveFilters ? filteredIncome - filteredExpenses : netProfit)}
                 </p>
               </div>
             </div>
@@ -264,33 +412,89 @@ export default function Finance() {
         </Card>
       </div>
 
-      {/* Toolbar */}
+      {/* Search and Filters Toolbar */}
       <Card className="mb-4">
         <CardContent className="py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Select value={filterType} onValueChange={(v) => setFilterType(v as any)}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="expense">Expenses</SelectItem>
-                  <SelectItem value="income">Income</SelectItem>
-                </SelectContent>
-              </Select>
-              <Badge variant="secondary">{transactions.length} records</Badge>
+          <div className="flex flex-col gap-3">
+            {/* Search and Date Range */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-48">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search transactions..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {dateFrom ? format(dateFrom, "dd/MM/yy") : "From"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {dateTo ? format(dateTo, "dd/MM/yy") : "To"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                  <X className="w-4 h-4 mr-1" /> Clear
+                </Button>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={exportToCSV}>
-                <Download className="w-4 h-4 mr-1" /> Export CSV
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleAddNew("expense")}>
-                <ArrowDownRight className="w-4 h-4 mr-1" /> Expense
-              </Button>
-              <Button size="sm" onClick={() => handleAddNew("income")}>
-                <ArrowUpRight className="w-4 h-4 mr-1" /> Income
-              </Button>
+
+            {/* Type filter and Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Select value={filterType} onValueChange={(v) => setFilterType(v as any)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="expense">Expenses</SelectItem>
+                    <SelectItem value="income">Income</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Badge variant="secondary">{transactions.length} records</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={exportToCSV}>
+                  <Download className="w-4 h-4 mr-1" /> Export
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleAddNew("expense")}>
+                  <ArrowDownRight className="w-4 h-4 mr-1" /> Expense
+                </Button>
+                <Button size="sm" onClick={() => handleAddNew("income")}>
+                  <ArrowUpRight className="w-4 h-4 mr-1" /> Income
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -323,7 +527,7 @@ export default function Finance() {
                 {transactions.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      No transactions yet. Add your first expense or income.
+                      {hasActiveFilters ? "No transactions match your filters." : "No transactions yet. Add your first expense or income."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -338,9 +542,21 @@ export default function Finance() {
                         )}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{t.date}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      <EditableCell
+                        transaction={t}
+                        field="date"
+                        value={t.date}
+                        displayValue={t.date}
+                      />
+                    </TableCell>
                     <TableCell className={`text-right font-semibold ${t.type === "income" ? "text-success" : "text-destructive"}`}>
-                      {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
+                      <EditableCell
+                        transaction={t}
+                        field="amount"
+                        value={t.amount.toString()}
+                        displayValue={<>{t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}</>}
+                      />
                     </TableCell>
                     <TableCell className="capitalize text-sm">
                       {t.type === "expense" ? t.category?.replace("_", " ") : t.paymentMethod}
@@ -349,8 +565,13 @@ export default function Finance() {
                     <TableCell className="text-sm">{t.vehicleNumber || "-"}</TableCell>
                     <TableCell className="text-sm">{t.driverName || "-"}</TableCell>
                     <TableCell className="text-sm">{t.clientName || "-"}</TableCell>
-                    <TableCell className="text-sm max-w-32 truncate" title={t.description || ""}>
-                      {t.description || t.reference || "-"}
+                    <TableCell className="text-sm max-w-32">
+                      <EditableCell
+                        transaction={t}
+                        field="description"
+                        value={t.description || t.reference || ""}
+                        displayValue={<span className="truncate block" title={t.description || ""}>{t.description || t.reference || "-"}</span>}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -369,6 +590,10 @@ export default function Finance() {
           </div>
         </CardContent>
       </Card>
+
+      <p className="text-xs text-muted-foreground mt-2 text-center">
+        💡 Double-click on Date, Amount, or Description to edit inline
+      </p>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
