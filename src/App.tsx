@@ -11,6 +11,7 @@ import Drivers from "./pages/Drivers";
 import Clients from "./pages/Clients";
 import Trips from "./pages/Trips";
 import Finance from "./pages/Finance";
+import Billing from "./pages/Billing";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import AdminCategories from "./pages/AdminCategories";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/clients" element={<Clients />} />
             <Route path="/trips" element={<Trips />} />
             <Route path="/finance" element={<Finance />} />
+            <Route path="/billing" element={<Billing />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin/categories" element={<AdminCategories />} />

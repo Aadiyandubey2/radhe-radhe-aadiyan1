@@ -5,6 +5,7 @@ import { useVehicles } from "@/hooks/useVehicles";
 import { useTrips } from "@/hooks/useTrips";
 import { useClients } from "@/hooks/useClients";
 import { useDrivers } from "@/hooks/useDrivers";
+import { useCategories } from "@/hooks/useCategories";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -54,6 +55,24 @@ export default function Finance() {
   const { data: trips } = useTrips();
   const { data: clients } = useClients();
   const { data: drivers } = useDrivers();
+  const { data: expenseCategories } = useCategories("expense_category");
+  const { data: paymentMethods } = useCategories("payment_method");
+
+  // Map category names to values
+  const normalizeKey = (name: string) =>
+    name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+
+  const expenseCategoryOptions = (expenseCategories?.length ? expenseCategories : [
+    { id: "s1", name: "Fuel" }, { id: "s2", name: "Driver Salary" },
+    { id: "s3", name: "Toll & Parking" }, { id: "s4", name: "Maintenance" },
+    { id: "s5", name: "Insurance" }, { id: "s6", name: "Permits" },
+    { id: "s7", name: "Miscellaneous" },
+  ]).map((c: any) => ({ value: normalizeKey(c.name), label: c.name }));
+
+  const paymentMethodOptions = (paymentMethods?.length ? paymentMethods : [
+    { id: "p1", name: "Cash" }, { id: "p2", name: "Bank Transfer" },
+    { id: "p3", name: "UPI" }, { id: "p4", name: "Cheque" },
+  ]).map((c: any) => ({ value: normalizeKey(c.name), label: c.name }));
   
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
@@ -632,13 +651,9 @@ export default function Finance() {
                   <Select name="category" defaultValue={editingTransaction?.category || ""} required>
                     <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fuel">Fuel</SelectItem>
-                      <SelectItem value="driver_salary">Driver Salary</SelectItem>
-                      <SelectItem value="toll_parking">Toll & Parking</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="insurance">Insurance</SelectItem>
-                      <SelectItem value="permits">Permits</SelectItem>
-                      <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
+                      {expenseCategoryOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -674,10 +689,9 @@ export default function Finance() {
                   <Select name="payment_method" defaultValue={editingTransaction?.paymentMethod || "cash"}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="bank">Bank Transfer</SelectItem>
-                      <SelectItem value="upi">UPI</SelectItem>
-                      <SelectItem value="cheque">Cheque</SelectItem>
+                      {paymentMethodOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
