@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -98,28 +98,5 @@ export function useGlobalSearch(query: string) {
     },
     enabled: !!user && query.length >= 2,
     staleTime: 1000,
-  });
-}
-
-export function useAIAssistant() {
-  return useMutation({
-    mutationFn: async ({ action, message, context }: { action?: string; message: string; context?: any }) => {
-      // Get fresh session to ensure valid JWT
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error("Not authenticated. Please log in.");
-      }
-
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: { action, message, context },
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onError: (error: any) => {
-      console.error("AI Assistant error:", error);
-    },
   });
 }

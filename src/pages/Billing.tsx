@@ -222,16 +222,20 @@ export default function Billing() {
 
   const shareViaWhatsApp = (bill: ClientBill) => {
     const text = generateBillText(bill);
-    const phone = bill.phone?.replace(/[^0-9]/g, "") || "";
+    let phone = bill.phone?.replace(/[^0-9]/g, "") || "";
+    
+    // Add country code if not present (assume India +91)
+    if (phone && phone.length === 10) {
+      phone = "91" + phone;
+    }
+    
     const encodedText = encodeURIComponent(text);
     
-    if (phone) {
-      // If phone number exists, open WhatsApp with that number
-      const whatsappUrl = `https://wa.me/91${phone}?text=${encodedText}`;
+    if (phone && phone.length >= 12) {
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodedText}`;
       window.open(whatsappUrl, "_blank");
     } else {
-      // Open WhatsApp without a specific number (user can choose)
-      const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
       window.open(whatsappUrl, "_blank");
     }
     toast.success("Opening WhatsApp... / व्हाट्सएप खोल रहे हैं...");
