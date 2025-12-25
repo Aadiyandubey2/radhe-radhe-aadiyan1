@@ -2,10 +2,13 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+const PIN_AUTH_KEY = "rrt_pin_authenticated";
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isPinAuthenticated: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -17,8 +20,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPinAuthenticated, setIsPinAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check PIN authentication
+    const pinAuth = localStorage.getItem(PIN_AUTH_KEY) === "true";
+    setIsPinAuthenticated(pinAuth);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -63,11 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    localStorage.removeItem(PIN_AUTH_KEY);
+    setIsPinAuthenticated(false);
     await supabase.auth.signOut();
   };
 
+  // Create a virtual user for PIN auth
+  const effectiveUser = user || (isPinAuthenticated ? { id: "pin-user", email: "local@radheradhe.transport" } as User : null);
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user: effectiveUser, session, loading, isPinAuthenticated, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
