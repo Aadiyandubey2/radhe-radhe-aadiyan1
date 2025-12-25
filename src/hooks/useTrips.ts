@@ -12,6 +12,10 @@ export interface Trip {
   client_id: string | null;
   pickup_location: string;
   drop_location: string;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
+  drop_lat: number | null;
+  drop_lng: number | null;
   goods_type: string | null;
   weight: string | null;
   distance_km: number | null;

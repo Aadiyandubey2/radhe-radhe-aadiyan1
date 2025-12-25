@@ -50,6 +50,39 @@ export type Database = {
         }
         Relationships: []
       }
+      categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address: string | null
@@ -327,6 +360,8 @@ export type Database = {
           created_at: string | null
           distance_km: number | null
           driver_id: string | null
+          drop_lat: number | null
+          drop_lng: number | null
           drop_location: string
           end_date: string | null
           fare_amount: number | null
@@ -334,6 +369,8 @@ export type Database = {
           id: string
           notes: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
+          pickup_lat: number | null
+          pickup_lng: number | null
           pickup_location: string
           start_date: string | null
           status: Database["public"]["Enums"]["trip_status"] | null
@@ -349,6 +386,8 @@ export type Database = {
           created_at?: string | null
           distance_km?: number | null
           driver_id?: string | null
+          drop_lat?: number | null
+          drop_lng?: number | null
           drop_location: string
           end_date?: string | null
           fare_amount?: number | null
@@ -356,6 +395,8 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          pickup_lat?: number | null
+          pickup_lng?: number | null
           pickup_location: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["trip_status"] | null
@@ -371,6 +412,8 @@ export type Database = {
           created_at?: string | null
           distance_km?: number | null
           driver_id?: string | null
+          drop_lat?: number | null
+          drop_lng?: number | null
           drop_location?: string
           end_date?: string | null
           fare_amount?: number | null
@@ -378,6 +421,8 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          pickup_lat?: number | null
+          pickup_lng?: number | null
           pickup_location?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["trip_status"] | null
@@ -503,7 +548,12 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "company_admin" | "manager" | "driver" | "accountant"
+      app_role:
+        | "company_admin"
+        | "manager"
+        | "driver"
+        | "accountant"
+        | "super_admin"
       expense_category:
         | "fuel"
         | "driver_salary"
@@ -647,7 +697,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["company_admin", "manager", "driver", "accountant"],
+      app_role: [
+        "company_admin",
+        "manager",
+        "driver",
+        "accountant",
+        "super_admin",
+      ],
       expense_category: [
         "fuel",
         "driver_salary",
