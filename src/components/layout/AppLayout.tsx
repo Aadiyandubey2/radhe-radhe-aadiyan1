@@ -2,11 +2,12 @@ import { ReactNode, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { Bell, Moon, Sun } from "lucide-react";
+import { Bell, Moon, Sun, Menu, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { AIAssistantPanel } from "@/components/AIAssistantPanel";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -18,6 +19,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
   const { user, loading } = useAuth();
   const [isDark, setIsDark] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -52,19 +54,53 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <AppSidebar />
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <AppSidebar />
+      </div>
+
+      {/* Mobile Sidebar */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <SheetContent side="left" className="p-0 w-72">
+          <AppSidebar />
+        </SheetContent>
+      </Sheet>
+
       <main className="flex-1 overflow-x-hidden">
-        <header className="sticky top-0 z-10 glass border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-display font-bold text-foreground">{title}</h1>
-              {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+        <header className="sticky top-0 z-10 glass border-b border-border px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2">
+            {/* Mobile menu button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-2xl font-display font-bold text-foreground truncate">{title}</h1>
+              {subtitle && <p className="text-xs sm:text-sm text-muted-foreground truncate">{subtitle}</p>}
             </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden md:block">
+            
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Desktop search */}
+              <div className="hidden lg:block">
                 <GlobalSearch onAIClick={() => setAiOpen(true)} />
               </div>
-              <Button variant="ghost" size="icon" className="relative" onClick={toggleTheme}>
+              
+              {/* Mobile AI button */}
+              <Button
+                variant="outline"
+                size="icon"
+                className="lg:hidden"
+                onClick={() => setAiOpen(true)}
+              >
+                <Sparkles className="w-4 h-4" />
+              </Button>
+
+              <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </Button>
               <Button variant="ghost" size="icon" className="relative">
@@ -74,7 +110,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
             </div>
           </div>
         </header>
-        <div className="p-6 animate-fade-in">{children}</div>
+        <div className="p-4 sm:p-6 animate-fade-in">{children}</div>
       </main>
       <AIAssistantPanel isOpen={aiOpen} onClose={() => setAiOpen(false)} />
     </div>

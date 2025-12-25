@@ -13,10 +13,12 @@ import {
   ChevronRight,
   Building2,
   Shield,
+  Receipt,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import logoImg from "@/assets/logo.png";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -25,6 +27,7 @@ const navigation = [
   { name: "Clients", href: "/clients", icon: Building2 },
   { name: "Trips", href: "/trips", icon: Route },
   { name: "Finance", href: "/finance", icon: Wallet },
+  { name: "Billing", href: "/billing", icon: Receipt },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
   { name: "Settings", href: "/settings", icon: Settings },
   { name: "Admin", href: "/admin/categories", icon: Shield },
@@ -45,9 +48,7 @@ export function AppSidebar() {
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
         {!collapsed && (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Truck className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src={logoImg} alt="FleetPro" className="w-10 h-10 rounded-xl object-cover" />
             <div>
               <h1 className="font-display font-bold text-sidebar-foreground">FleetPro</h1>
               <p className="text-xs text-sidebar-foreground/60">Transport Management</p>
@@ -55,9 +56,7 @@ export function AppSidebar() {
           </div>
         )}
         {collapsed && (
-          <div className="w-10 h-10 mx-auto rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Truck className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src={logoImg} alt="FleetPro" className="w-10 h-10 mx-auto rounded-xl object-cover" />
         )}
       </div>
 
