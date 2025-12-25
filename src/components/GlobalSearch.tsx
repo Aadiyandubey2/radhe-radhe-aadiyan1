@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Route, Truck, Users, Building2, Loader2, X, Sparkles } from "lucide-react";
+import { Search, Route, Truck, Users, Building2, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useGlobalSearch, SearchResult, useAIAssistant } from "@/hooks/useSearch";
+import { useGlobalSearch, SearchResult } from "@/hooks/useSearch";
 import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, any> = {
@@ -14,11 +13,7 @@ const iconMap: Record<string, any> = {
   Building2,
 };
 
-interface GlobalSearchProps {
-  onAIClick?: () => void;
-}
-
-export function GlobalSearch({ onAIClick }: GlobalSearchProps) {
+export function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,34 +66,24 @@ export function GlobalSearch({ onAIClick }: GlobalSearchProps) {
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="relative flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
-            onFocus={() => setIsOpen(true)}
-            placeholder="Search trips, vehicles, drivers... (⌘K)"
-            className="pl-10 pr-10 w-64 bg-secondary/50 border-0 focus-visible:ring-1"
-          />
-          {query && (
-            <button
-              onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onAIClick}
-          className="relative bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30"
-        >
-          <Sparkles className="w-5 h-5 text-primary" />
-        </Button>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setIsOpen(true); }}
+          onFocus={() => setIsOpen(true)}
+          placeholder="Search trips, vehicles, drivers... (⌘K)"
+          className="pl-10 pr-10 w-64 bg-secondary/50 border-0 focus-visible:ring-1"
+        />
+        {query && (
+          <button
+            onClick={() => { setQuery(""); inputRef.current?.focus(); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {isOpen && query.length >= 2 && (

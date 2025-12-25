@@ -7,7 +7,6 @@ import {
   Route,
   Wallet,
   TrendingUp,
-  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -29,7 +28,6 @@ const navigation = [
   { name: "Finance", href: "/finance", icon: Wallet },
   { name: "Billing", href: "/billing", icon: Receipt },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
-  { name: "Settings", href: "/settings", icon: Settings },
   { name: "Admin", href: "/admin/categories", icon: Shield },
 ];
 

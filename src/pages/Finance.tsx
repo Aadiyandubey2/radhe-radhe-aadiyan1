@@ -616,7 +616,7 @@ export default function Finance() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
               {editingTransaction ? "Edit" : "Add"} {transactionType === "expense" ? "Expense" : "Income"}

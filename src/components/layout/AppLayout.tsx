@@ -2,12 +2,11 @@ import { ReactNode, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { Bell, Moon, Sun, Menu, X, Sparkles } from "lucide-react";
+import { Bell, Moon, Sun, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { AIAssistantPanel } from "@/components/AIAssistantPanel";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -18,7 +17,6 @@ interface AppLayoutProps {
 export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
   const { user, loading } = useAuth();
   const [isDark, setIsDark] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -87,18 +85,8 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
             <div className="flex items-center gap-2 sm:gap-4">
               {/* Desktop search */}
               <div className="hidden lg:block">
-                <GlobalSearch onAIClick={() => setAiOpen(true)} />
+                <GlobalSearch />
               </div>
-              
-              {/* Mobile AI button */}
-              <Button
-                variant="outline"
-                size="icon"
-                className="lg:hidden"
-                onClick={() => setAiOpen(true)}
-              >
-                <Sparkles className="w-4 h-4" />
-              </Button>
 
               <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -112,7 +100,6 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
         </header>
         <div className="p-4 sm:p-6 animate-fade-in">{children}</div>
       </main>
-      <AIAssistantPanel isOpen={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   );
 }
