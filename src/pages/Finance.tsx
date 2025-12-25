@@ -4,15 +4,39 @@ import { useIncome, useCreateIncome, useUpdateIncome, useDeleteIncome } from "@/
 import { useVehicles } from "@/hooks/useVehicles";
 import { useTrips } from "@/hooks/useTrips";
 import { useClients } from "@/hooks/useClients";
+import { useDrivers } from "@/hooks/useDrivers";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Trash2, Edit } from "lucide-react";
-import { useState } from "react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Edit, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Wallet, Download } from "lucide-react";
+import { useState, useMemo } from "react";
+
+type TransactionType = "expense" | "income";
+
+interface UnifiedTransaction {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  category?: string;
+  paymentMethod?: string;
+  tripId?: string | null;
+  tripNumber?: string | null;
+  vehicleId?: string | null;
+  vehicleNumber?: string | null;
+  driverId?: string | null;
+  driverName?: string | null;
+  clientId?: string | null;
+  clientName?: string | null;
+  description?: string | null;
+  reference?: string | null;
+  originalData: any;
+}
 
 export default function Finance() {
   const { data: expenses } = useExpenses();
@@ -20,263 +44,469 @@ export default function Finance() {
   const { data: vehicles } = useVehicles();
   const { data: trips } = useTrips();
   const { data: clients } = useClients();
+  const { data: drivers } = useDrivers();
+  
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
   const createIncome = useCreateIncome();
   const updateIncome = useUpdateIncome();
   const deleteIncome = useDeleteIncome();
-  
-  const [expenseOpen, setExpenseOpen] = useState(false);
-  const [incomeOpen, setIncomeOpen] = useState(false);
-  const [editExpenseOpen, setEditExpenseOpen] = useState(false);
-  const [editIncomeOpen, setEditIncomeOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<any>(null);
-  const [selectedIncome, setSelectedIncome] = useState<any>(null);
 
-  const formatCurrency = (v: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<UnifiedTransaction | null>(null);
+  const [transactionType, setTransactionType] = useState<TransactionType>("expense");
+  const [filterType, setFilterType] = useState<"all" | "expense" | "income">("all");
+  const [sortField, setSortField] = useState<"date" | "amount">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Combine expenses and income into unified transactions
+  const transactions = useMemo<UnifiedTransaction[]>(() => {
+    const expenseRows: UnifiedTransaction[] = (expenses || []).map((e) => ({
+      id: e.id,
+      type: "expense" as const,
+      date: e.expense_date || "",
+      amount: Number(e.amount),
+      category: e.category,
+      tripId: e.trip_id,
+      tripNumber: e.trips?.trip_number,
+      vehicleId: e.vehicle_id,
+      vehicleNumber: e.vehicles?.vehicle_number,
+      driverId: e.driver_id,
+      driverName: e.drivers?.name,
+      description: e.description,
+      originalData: e,
+    }));
+
+    const incomeRows: UnifiedTransaction[] = (income || []).map((i) => ({
+      id: i.id,
+      type: "income" as const,
+      date: i.payment_date || "",
+      amount: Number(i.amount),
+      paymentMethod: i.payment_method,
+      tripId: i.trip_id,
+      tripNumber: i.trips?.trip_number,
+      clientId: i.client_id,
+      clientName: i.clients?.name,
+      description: i.notes,
+      reference: i.reference_number,
+      originalData: i,
+    }));
+
+    let combined = [...expenseRows, ...incomeRows];
+
+    // Filter
+    if (filterType !== "all") {
+      combined = combined.filter((t) => t.type === filterType);
+    }
+
+    // Sort
+    combined.sort((a, b) => {
+      if (sortField === "date") {
+        const dateA = new Date(a.date).getTime() || 0;
+        const dateB = new Date(b.date).getTime() || 0;
+        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+      } else {
+        return sortOrder === "asc" ? a.amount - b.amount : b.amount - a.amount;
+      }
+    });
+
+    return combined;
+  }, [expenses, income, filterType, sortField, sortOrder]);
+
+  const formatCurrency = (v: number) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+
   const totalIncome = income?.reduce((s, i) => s + Number(i.amount), 0) || 0;
   const totalExpenses = expenses?.reduce((s, e) => s + Number(e.amount), 0) || 0;
+  const netProfit = totalIncome - totalExpenses;
 
-  const handleExpense = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    await createExpense.mutateAsync({
-      category: fd.get("category") as any,
-      amount: parseFloat(fd.get("amount") as string),
-      description: fd.get("description") as string || null,
-      expense_date: fd.get("date") as string || new Date().toISOString().split("T")[0],
-      vehicle_id: fd.get("vehicle_id") as string || null,
-      trip_id: fd.get("trip_id") as string || null,
-      driver_id: null,
-      receipt_url: null,
-    });
-    setExpenseOpen(false);
+  const handleAddNew = (type: TransactionType) => {
+    setTransactionType(type);
+    setEditingTransaction(null);
+    setDialogOpen(true);
   };
 
-  const handleEditExpense = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    await updateExpense.mutateAsync({
-      id: selectedExpense.id,
-      category: fd.get("category") as any,
-      amount: parseFloat(fd.get("amount") as string),
-      description: fd.get("description") as string || null,
-      expense_date: fd.get("date") as string,
-      vehicle_id: fd.get("vehicle_id") as string || null,
-      trip_id: fd.get("trip_id") as string || null,
-    });
-    setEditExpenseOpen(false);
-    setSelectedExpense(null);
+  const handleEdit = (transaction: UnifiedTransaction) => {
+    setTransactionType(transaction.type);
+    setEditingTransaction(transaction);
+    setDialogOpen(true);
   };
 
-  const handleIncome = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    await createIncome.mutateAsync({
-      amount: parseFloat(fd.get("amount") as string),
-      payment_date: fd.get("date") as string || new Date().toISOString().split("T")[0],
-      payment_method: fd.get("method") as string || "cash",
-      trip_id: fd.get("trip_id") as string || null,
-      client_id: fd.get("client_id") as string || null,
-      reference_number: fd.get("reference") as string || null,
-      notes: fd.get("notes") as string || null,
-    });
-    setIncomeOpen(false);
+  const handleDelete = async (transaction: UnifiedTransaction) => {
+    if (transaction.type === "expense") {
+      await deleteExpense.mutateAsync(transaction.id);
+    } else {
+      await deleteIncome.mutateAsync(transaction.id);
+    }
   };
 
-  const handleEditIncome = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    await updateIncome.mutateAsync({
-      id: selectedIncome.id,
-      amount: parseFloat(fd.get("amount") as string),
-      payment_date: fd.get("date") as string,
-      payment_method: fd.get("method") as string,
-      trip_id: fd.get("trip_id") as string || null,
-      client_id: fd.get("client_id") as string || null,
-      reference_number: fd.get("reference") as string || null,
-      notes: fd.get("notes") as string || null,
-    });
-    setEditIncomeOpen(false);
-    setSelectedIncome(null);
+
+    if (transactionType === "expense") {
+      const expenseData = {
+        category: fd.get("category") as any,
+        amount: parseFloat(fd.get("amount") as string),
+        description: (fd.get("description") as string) || null,
+        expense_date: (fd.get("date") as string) || new Date().toISOString().split("T")[0],
+        vehicle_id: (fd.get("vehicle_id") as string) || null,
+        trip_id: (fd.get("trip_id") as string) || null,
+        driver_id: (fd.get("driver_id") as string) || null,
+        receipt_url: null,
+      };
+
+      if (editingTransaction) {
+        await updateExpense.mutateAsync({ id: editingTransaction.id, ...expenseData });
+      } else {
+        await createExpense.mutateAsync(expenseData);
+      }
+    } else {
+      const incomeData = {
+        amount: parseFloat(fd.get("amount") as string),
+        payment_date: (fd.get("date") as string) || new Date().toISOString().split("T")[0],
+        payment_method: (fd.get("payment_method") as string) || "cash",
+        trip_id: (fd.get("trip_id") as string) || null,
+        client_id: (fd.get("client_id") as string) || null,
+        reference_number: (fd.get("reference") as string) || null,
+        notes: (fd.get("description") as string) || null,
+      };
+
+      if (editingTransaction) {
+        await updateIncome.mutateAsync({ id: editingTransaction.id, ...incomeData });
+      } else {
+        await createIncome.mutateAsync(incomeData);
+      }
+    }
+
+    setDialogOpen(false);
+    setEditingTransaction(null);
   };
 
-  const ExpenseForm = ({ expense, onSubmit, isPending, buttonText }: any) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div><Label>Category *</Label>
-        <Select name="category" defaultValue={expense?.category || ""} required>
-          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="fuel">Fuel</SelectItem>
-            <SelectItem value="driver_salary">Driver Salary</SelectItem>
-            <SelectItem value="toll_parking">Toll & Parking</SelectItem>
-            <SelectItem value="maintenance">Maintenance</SelectItem>
-            <SelectItem value="insurance">Insurance</SelectItem>
-            <SelectItem value="permits">Permits</SelectItem>
-            <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div><Label>Amount *</Label><Input name="amount" type="number" defaultValue={expense?.amount} required /></div>
-      <div><Label>Date</Label><Input name="date" type="date" defaultValue={expense?.expense_date} /></div>
-      <div><Label>Vehicle</Label>
-        <Select name="vehicle_id" defaultValue={expense?.vehicle_id || ""}>
-          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-          <SelectContent>{vehicles?.map((v) => <SelectItem key={v.id} value={v.id}>{v.vehicle_number}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Trip</Label>
-        <Select name="trip_id" defaultValue={expense?.trip_id || ""}>
-          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-          <SelectContent>{trips?.map((t) => <SelectItem key={t.id} value={t.id}>{t.trip_number}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Description</Label><Input name="description" defaultValue={expense?.description} /></div>
-      <Button type="submit" className="w-full" disabled={isPending}>{isPending ? "Saving..." : buttonText}</Button>
-    </form>
-  );
+  const exportToCSV = () => {
+    const headers = ["Type", "Date", "Amount", "Category/Method", "Trip", "Vehicle", "Driver", "Client", "Description", "Reference"];
+    const rows = transactions.map((t) => [
+      t.type,
+      t.date,
+      t.type === "expense" ? -t.amount : t.amount,
+      t.type === "expense" ? t.category : t.paymentMethod,
+      t.tripNumber || "",
+      t.vehicleNumber || "",
+      t.driverName || "",
+      t.clientName || "",
+      t.description || "",
+      t.reference || "",
+    ]);
 
-  const IncomeForm = ({ inc, onSubmit, isPending, buttonText }: any) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div><Label>Amount *</Label><Input name="amount" type="number" defaultValue={inc?.amount} required /></div>
-      <div><Label>Date</Label><Input name="date" type="date" defaultValue={inc?.payment_date} /></div>
-      <div><Label>Payment Method</Label>
-        <Select name="method" defaultValue={inc?.payment_method || "cash"}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="cash">Cash</SelectItem>
-            <SelectItem value="bank">Bank Transfer</SelectItem>
-            <SelectItem value="upi">UPI</SelectItem>
-            <SelectItem value="cheque">Cheque</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div><Label>Trip</Label>
-        <Select name="trip_id" defaultValue={inc?.trip_id || ""}>
-          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-          <SelectContent>{trips?.map((t) => <SelectItem key={t.id} value={t.id}>{t.trip_number}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Client</Label>
-        <Select name="client_id" defaultValue={inc?.client_id || ""}>
-          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-          <SelectContent>{clients?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
-      <div><Label>Reference</Label><Input name="reference" defaultValue={inc?.reference_number} /></div>
-      <div><Label>Notes</Label><Input name="notes" defaultValue={inc?.notes} /></div>
-      <Button type="submit" className="w-full" disabled={isPending}>{isPending ? "Saving..." : buttonText}</Button>
-    </form>
-  );
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `finance_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+  };
+
+  const toggleSort = (field: "date" | "amount") => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  };
 
   return (
-    <AppLayout title="Finance" subtitle="Track income and expenses">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-success/10 to-success/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-success/10"><TrendingUp className="w-6 h-6 text-success" /></div>
-              <div><p className="text-sm text-muted-foreground">Total Income</p><p className="text-2xl font-bold">{formatCurrency(totalIncome)}</p></div>
+    <AppLayout title="Finance Database" subtitle="All transactions in one place">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-success/10">
+                <TrendingUp className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Income</p>
+                <p className="text-xl font-bold text-success">{formatCurrency(totalIncome)}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-destructive/10"><TrendingDown className="w-6 h-6 text-destructive" /></div>
-              <div><p className="text-sm text-muted-foreground">Total Expenses</p><p className="text-2xl font-bold">{formatCurrency(totalExpenses)}</p></div>
+        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <TrendingDown className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Expenses</p>
+                <p className="text-xl font-bold text-destructive">{formatCurrency(totalExpenses)}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card className={`bg-gradient-to-br ${totalIncome - totalExpenses >= 0 ? "from-success/10 to-success/5" : "from-destructive/10 to-destructive/5"}`}>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-primary/10"><Wallet className="w-6 h-6 text-primary" /></div>
-              <div><p className="text-sm text-muted-foreground">Net Profit</p><p className="text-2xl font-bold">{formatCurrency(totalIncome - totalExpenses)}</p></div>
+        <Card className={`bg-gradient-to-br ${netProfit >= 0 ? "from-success/10 to-success/5 border-success/20" : "from-destructive/10 to-destructive/5 border-destructive/20"}`}>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Wallet className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Net Profit</p>
+                <p className={`text-xl font-bold ${netProfit >= 0 ? "text-success" : "text-destructive"}`}>
+                  {formatCurrency(netProfit)}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Edit Dialogs */}
-      <Dialog open={editExpenseOpen} onOpenChange={(o) => { setEditExpenseOpen(o); if (!o) setSelectedExpense(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit Expense</DialogTitle></DialogHeader>
-          {selectedExpense && <ExpenseForm expense={selectedExpense} onSubmit={handleEditExpense} isPending={updateExpense.isPending} buttonText="Save Changes" />}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editIncomeOpen} onOpenChange={(o) => { setEditIncomeOpen(o); if (!o) setSelectedIncome(null); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit Income</DialogTitle></DialogHeader>
-          {selectedIncome && <IncomeForm inc={selectedIncome} onSubmit={handleEditIncome} isPending={updateIncome.isPending} buttonText="Save Changes" />}
-        </DialogContent>
-      </Dialog>
-
-      <Tabs defaultValue="expenses">
-        <div className="flex justify-between items-center mb-4">
-          <TabsList><TabsTrigger value="expenses">Expenses</TabsTrigger><TabsTrigger value="income">Income</TabsTrigger></TabsList>
-          <div className="flex gap-2">
-            <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
-              <DialogTrigger asChild><Button variant="outline"><ArrowDownRight className="w-4 h-4 mr-2" />Add Expense</Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
-                <ExpenseForm onSubmit={handleExpense} isPending={createExpense.isPending} buttonText="Add Expense" />
-              </DialogContent>
-            </Dialog>
-            <Dialog open={incomeOpen} onOpenChange={setIncomeOpen}>
-              <DialogTrigger asChild><Button><ArrowUpRight className="w-4 h-4 mr-2" />Add Income</Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Add Income</DialogTitle></DialogHeader>
-                <IncomeForm onSubmit={handleIncome} isPending={createIncome.isPending} buttonText="Add Income" />
-              </DialogContent>
-            </Dialog>
+      {/* Toolbar */}
+      <Card className="mb-4">
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Select value={filterType} onValueChange={(v) => setFilterType(v as any)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="expense">Expenses</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                </SelectContent>
+              </Select>
+              <Badge variant="secondary">{transactions.length} records</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="w-4 h-4 mr-1" /> Export CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleAddNew("expense")}>
+                <ArrowDownRight className="w-4 h-4 mr-1" /> Expense
+              </Button>
+              <Button size="sm" onClick={() => handleAddNew("income")}>
+                <ArrowUpRight className="w-4 h-4 mr-1" /> Income
+              </Button>
+            </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="expenses">
-          <Card><CardContent className="pt-6">
-            <div className="space-y-3">
-              {expenses?.map((exp) => (
-                <div key={exp.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center"><ArrowDownRight className="w-5 h-5 text-destructive" /></div>
-                    <div><p className="font-medium capitalize">{exp.category.replace("_", " ")}</p><p className="text-sm text-muted-foreground">{exp.expense_date} • {exp.vehicles?.vehicle_number || "General"}</p></div>
+      {/* Spreadsheet Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-24">Type</TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted" onClick={() => toggleSort("date")}>
+                    Date {sortField === "date" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted text-right" onClick={() => toggleSort("amount")}>
+                    Amount {sortField === "amount" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </TableHead>
+                  <TableHead>Category / Method</TableHead>
+                  <TableHead>Trip</TableHead>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Driver</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-20 text-center">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      No transactions yet. Add your first expense or income.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {transactions.map((t) => (
+                  <TableRow key={`${t.type}-${t.id}`} className="hover:bg-muted/30">
+                    <TableCell>
+                      <Badge variant={t.type === "income" ? "default" : "destructive"} className="text-xs">
+                        {t.type === "income" ? (
+                          <><ArrowUpRight className="w-3 h-3 mr-1" /> In</>
+                        ) : (
+                          <><ArrowDownRight className="w-3 h-3 mr-1" /> Out</>
+                        )}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">{t.date}</TableCell>
+                    <TableCell className={`text-right font-semibold ${t.type === "income" ? "text-success" : "text-destructive"}`}>
+                      {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
+                    </TableCell>
+                    <TableCell className="capitalize text-sm">
+                      {t.type === "expense" ? t.category?.replace("_", " ") : t.paymentMethod}
+                    </TableCell>
+                    <TableCell className="text-sm">{t.tripNumber || "-"}</TableCell>
+                    <TableCell className="text-sm">{t.vehicleNumber || "-"}</TableCell>
+                    <TableCell className="text-sm">{t.driverName || "-"}</TableCell>
+                    <TableCell className="text-sm">{t.clientName || "-"}</TableCell>
+                    <TableCell className="text-sm max-w-32 truncate" title={t.description || ""}>
+                      {t.description || t.reference || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(t)}>
+                          <Edit className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(t)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTransaction ? "Edit" : "Add"} {transactionType === "expense" ? "Expense" : "Income"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Amount *</Label>
+                <Input
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  defaultValue={editingTransaction?.amount}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input
+                  name="date"
+                  type="date"
+                  defaultValue={editingTransaction?.date || new Date().toISOString().split("T")[0]}
+                />
+              </div>
+            </div>
+
+            {transactionType === "expense" ? (
+              <>
+                <div>
+                  <Label>Category *</Label>
+                  <Select name="category" defaultValue={editingTransaction?.category || ""} required>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fuel">Fuel</SelectItem>
+                      <SelectItem value="driver_salary">Driver Salary</SelectItem>
+                      <SelectItem value="toll_parking">Toll & Parking</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="insurance">Insurance</SelectItem>
+                      <SelectItem value="permits">Permits</SelectItem>
+                      <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Vehicle</Label>
+                    <Select name="vehicle_id" defaultValue={editingTransaction?.vehicleId || ""}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {vehicles?.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>{v.vehicle_number}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <p className="font-semibold text-destructive">-{formatCurrency(exp.amount)}</p>
-                    <Button size="sm" variant="ghost" onClick={() => { setSelectedExpense(exp); setEditExpenseOpen(true); }}><Edit className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => deleteExpense.mutate(exp.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  <div>
+                    <Label>Driver</Label>
+                    <Select name="driver_id" defaultValue={editingTransaction?.driverId || ""}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {drivers?.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              ))}
-              {expenses?.length === 0 && <p className="text-center py-8 text-muted-foreground">No expenses recorded</p>}
-            </div>
-          </CardContent></Card>
-        </TabsContent>
-
-        <TabsContent value="income">
-          <Card><CardContent className="pt-6">
-            <div className="space-y-3">
-              {income?.map((inc) => (
-                <div key={inc.id} className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center"><ArrowUpRight className="w-5 h-5 text-success" /></div>
-                    <div><p className="font-medium">{inc.trips?.trip_number || "Direct Payment"}</p><p className="text-sm text-muted-foreground">{inc.payment_date} • {inc.payment_method}</p></div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label>Payment Method</Label>
+                  <Select name="payment_method" defaultValue={editingTransaction?.paymentMethod || "cash"}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="bank">Bank Transfer</SelectItem>
+                      <SelectItem value="upi">UPI</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Client</Label>
+                    <Select name="client_id" defaultValue={editingTransaction?.clientId || ""}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        {clients?.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <p className="font-semibold text-success">+{formatCurrency(inc.amount)}</p>
-                    <Button size="sm" variant="ghost" onClick={() => { setSelectedIncome(inc); setEditIncomeOpen(true); }}><Edit className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => deleteIncome.mutate(inc.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  <div>
+                    <Label>Reference #</Label>
+                    <Input name="reference" defaultValue={editingTransaction?.reference || ""} />
                   </div>
                 </div>
-              ))}
-              {income?.length === 0 && <p className="text-center py-8 text-muted-foreground">No income recorded</p>}
+              </>
+            )}
+
+            <div>
+              <Label>Trip</Label>
+              <Select name="trip_id" defaultValue={editingTransaction?.tripId || ""}>
+                <SelectTrigger><SelectValue placeholder="Select trip" /></SelectTrigger>
+                <SelectContent>
+                  {trips?.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.trip_number}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent></Card>
-        </TabsContent>
-      </Tabs>
+
+            <div>
+              <Label>{transactionType === "expense" ? "Description" : "Notes"}</Label>
+              <Input name="description" defaultValue={editingTransaction?.description || ""} />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createExpense.isPending || updateExpense.isPending || createIncome.isPending || updateIncome.isPending}
+            >
+              {(createExpense.isPending || updateExpense.isPending || createIncome.isPending || updateIncome.isPending)
+                ? "Saving..."
+                : editingTransaction
+                  ? "Save Changes"
+                  : `Add ${transactionType === "expense" ? "Expense" : "Income"}`}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
