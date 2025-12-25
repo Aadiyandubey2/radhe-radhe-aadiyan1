@@ -63,6 +63,32 @@ export function useCreateIncome() {
   });
 }
 
+export function useUpdateIncome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...income }: Partial<Income> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("income")
+        .update(income)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["income"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      toast.success("Income updated successfully");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
 export function useDeleteIncome() {
   const queryClient = useQueryClient();
 

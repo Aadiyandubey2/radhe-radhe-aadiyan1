@@ -2,6 +2,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useTrips } from "@/hooks/useTrips";
+import { useVehicles } from "@/hooks/useVehicles";
+import { useDrivers } from "@/hooks/useDrivers";
 import {
   Truck,
   Users,
@@ -11,7 +13,6 @@ import {
   TrendingDown,
   Clock,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,8 @@ const COLORS = ["hsl(217, 91%, 60%)", "hsl(262, 83%, 58%)", "hsl(142, 76%, 36%)"
 export default function Dashboard() {
   const { data: analytics, isLoading } = useAnalytics();
   const { data: trips } = useTrips();
+  const { data: vehicles } = useVehicles();
+  const { data: drivers } = useDrivers();
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
@@ -49,6 +52,12 @@ export default function Dashboard() {
         return "bg-muted text-muted-foreground";
     }
   };
+
+  // Calculate real stats from data
+  const activeVehicles = vehicles?.filter(v => v.status === "active").length || 0;
+  const activeDrivers = drivers?.filter((d: any) => d.is_active).length || 0;
+  const totalTrips = trips?.length || 0;
+  const completedTrips = trips?.filter(t => t.status === "completed").length || 0;
 
   if (isLoading) {
     return (
@@ -71,7 +80,6 @@ export default function Dashboard() {
           value={formatCurrency(analytics?.totalIncome || 0)}
           icon={<Wallet className="w-6 h-6" />}
           variant="success"
-          trend={{ value: 12, label: "vs last month" }}
         />
         <StatsCard
           title="Total Expenses"
@@ -97,22 +105,22 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <StatsCard
           title="Active Vehicles"
-          value={analytics?.activeVehicles || 0}
+          value={activeVehicles}
           icon={<Truck className="w-6 h-6" />}
         />
         <StatsCard
           title="Active Drivers"
-          value={analytics?.activeDrivers || 0}
+          value={activeDrivers}
           icon={<Users className="w-6 h-6" />}
         />
         <StatsCard
           title="Total Trips"
-          value={analytics?.totalTrips || 0}
+          value={totalTrips}
           icon={<Route className="w-6 h-6" />}
         />
         <StatsCard
           title="Completed Trips"
-          value={analytics?.completedTrips || 0}
+          value={completedTrips}
           icon={<CheckCircle className="w-6 h-6" />}
           variant="success"
         />
@@ -127,44 +135,50 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={analytics?.monthlyTrends || []}>
-                  <defs>
-                    <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" className="text-muted-foreground" />
-                  <YAxis className="text-muted-foreground" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="income"
-                    stroke="hsl(142, 76%, 36%)"
-                    fill="url(#incomeGradient)"
-                    strokeWidth={2}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="expenses"
-                    stroke="hsl(0, 84%, 60%)"
-                    fill="url(#expenseGradient)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {(analytics?.monthlyTrends?.length || 0) > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analytics?.monthlyTrends || []}>
+                    <defs>
+                      <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="month" className="text-muted-foreground" />
+                    <YAxis className="text-muted-foreground" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      stroke="hsl(142, 76%, 36%)"
+                      fill="url(#incomeGradient)"
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="expenses"
+                      stroke="hsl(0, 84%, 60%)"
+                      fill="url(#expenseGradient)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>Add income and expenses to see trends</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -176,43 +190,51 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={analytics?.expensesByCategory || []}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="amount"
-                    nameKey="category"
-                  >
-                    {(analytics?.expensesByCategory || []).map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              {(analytics?.expensesByCategory?.length || 0) > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height="70%">
+                    <PieChart>
+                      <Pie
+                        data={analytics?.expensesByCategory || []}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="amount"
+                        nameKey="category"
+                      >
+                        {(analytics?.expensesByCategory || []).map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number) => formatCurrency(value)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 space-y-2">
+                    {(analytics?.expensesByCategory || []).slice(0, 4).map((item, i) => (
+                      <div key={item.category} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                          <span className="text-muted-foreground">{item.category}</span>
+                        </div>
+                        <span className="font-medium">{formatCurrency(item.amount)}</span>
+                      </div>
                     ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 space-y-2">
-              {(analytics?.expensesByCategory || []).slice(0, 4).map((item, i) => (
-                <div key={item.category} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                    <span className="text-muted-foreground">{item.category}</span>
                   </div>
-                  <span className="font-medium">{formatCurrency(item.amount)}</span>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>Add expenses to see breakdown</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -264,11 +286,11 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-display">Vehicle Performance</CardTitle>
-            <Badge variant="secondary">{analytics?.vehicleWiseProfits?.length || 0} vehicles</Badge>
+            <Badge variant="secondary">{vehicles?.length || 0} vehicles</Badge>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(analytics?.vehicleWiseProfits || []).slice(0, 5).map((vehicle, i) => (
+              {(analytics?.vehicleWiseProfits || []).slice(0, 5).map((vehicle) => (
                 <div
                   key={vehicle.vehicle}
                   className="flex items-center justify-between p-4 rounded-lg bg-secondary/30"
@@ -300,7 +322,7 @@ export default function Dashboard() {
               ))}
               {(!analytics?.vehicleWiseProfits || analytics.vehicleWiseProfits.length === 0) && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <Truck className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <p>Add vehicles to see performance</p>
                 </div>
               )}
