@@ -102,10 +102,15 @@ export function useGlobalSearch(query: string) {
 }
 
 export function useAIAssistant() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({ action, message, context }: { action?: string; message: string; context?: any }) => {
+      // Get fresh session to ensure valid JWT
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error("Not authenticated. Please log in.");
+      }
+
       const { data, error } = await supabase.functions.invoke("ai-assistant", {
         body: { action, message, context },
       });
