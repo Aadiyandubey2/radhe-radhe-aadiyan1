@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Finance", href: "/finance", icon: Wallet },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
   { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Admin", href: "/admin/categories", icon: Shield },
 ];
 
 export function AppSidebar() {

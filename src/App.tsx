@@ -13,6 +13,7 @@ import Trips from "./pages/Trips";
 import Finance from "./pages/Finance";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import AdminCategories from "./pages/AdminCategories";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/finance" element={<Finance />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin/categories" element={<AdminCategories />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
