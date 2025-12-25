@@ -279,12 +279,12 @@ export default function Billing() {
                 className="pl-9"
               />
             </div>
-            <Select value={selectedClient} onValueChange={setSelectedClient}>
+            <Select value={selectedClient} onValueChange={(v) => setSelectedClient(v === "all" ? "" : v)}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="All Clients" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Clients</SelectItem>
+                <SelectItem value="all">All Clients</SelectItem>
                 {clients?.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
