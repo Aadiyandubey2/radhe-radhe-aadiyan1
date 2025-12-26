@@ -32,7 +32,7 @@ export default function AuthPage() {
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
-  const { signIn, user } = useAuth();
+  const { signIn, signInWithPin, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function AuthPage() {
     return null;
   }
 
-  const handlePinLogin = () => {
+  const handlePinLogin = async () => {
     if (pin.length !== 4) {
       toast.error("Please enter 4-digit PIN / 4 अंकों का पिन दर्ज करें");
       return;
@@ -53,9 +53,17 @@ export default function AuthPage() {
 
     const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
     if (storedHash && hashPin(pin) === storedHash) {
+      setIsLoading(true);
+      const { error } = await signInWithPin();
+      setIsLoading(false);
+      
+      if (error) {
+        toast.error("Login failed / लॉगिन विफल");
+        return;
+      }
+      
       toast.success("🙏 स्वागत है! Welcome!");
-      localStorage.setItem("rrt_pin_authenticated", "true");
-      window.location.href = "/dashboard";
+      navigate("/dashboard");
     } else {
       toast.error("Invalid PIN / गलत पिन");
       setPin("");
