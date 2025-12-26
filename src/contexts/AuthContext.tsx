@@ -11,6 +11,7 @@ interface AuthContextType {
   isPinAuthenticated: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithPin: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -70,17 +71,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
+  // Sign in with anonymous user for PIN authentication
+  const signInWithPin = async () => {
+    const { error } = await supabase.auth.signInAnonymously();
+    if (!error) {
+      localStorage.setItem(PIN_AUTH_KEY, "true");
+      setIsPinAuthenticated(true);
+    }
+    return { error: error as Error | null };
+  };
+
   const signOut = async () => {
     localStorage.removeItem(PIN_AUTH_KEY);
     setIsPinAuthenticated(false);
     await supabase.auth.signOut();
   };
 
-  // Create a virtual user for PIN auth
-  const effectiveUser = user || (isPinAuthenticated ? { id: "pin-user", email: "local@radheradhe.transport" } as User : null);
-
   return (
-    <AuthContext.Provider value={{ user: effectiveUser, session, loading, isPinAuthenticated, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, isPinAuthenticated, signUp, signIn, signInWithPin, signOut }}>
       {children}
     </AuthContext.Provider>
   );
