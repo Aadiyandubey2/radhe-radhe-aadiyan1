@@ -6,37 +6,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Mail, Lock, ArrowRight, Loader2, KeyRound } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import logoImg from "@/assets/logo.png";
-
-// Simple hash function for PIN storage
-const hashPin = (pin: string) => {
-  let hash = 0;
-  for (let i = 0; i < pin.length; i++) {
-    const char = pin.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString();
-};
-
-const PIN_STORAGE_KEY = "rrt_pin_hash";
-const PIN_SET_KEY = "rrt_pin_set";
+import { verifyPinLogin } from "@/hooks/usePinUsers";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [pin, setPin] = useState("");
-  const [isPinSet, setIsPinSet] = useState(false);
-  const [isSettingPin, setIsSettingPin] = useState(false);
-  const [newPin, setNewPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
+  const [hasPinUsers, setHasPinUsers] = useState(false);
+  const [checkingPinUsers, setCheckingPinUsers] = useState(true);
   const { signIn, signInWithPin, user } = useAuth();
   const navigate = useNavigate();
 
+  // Check if any PIN users exist in the system
   useEffect(() => {
-    setIsPinSet(localStorage.getItem(PIN_SET_KEY) === "true");
+    const checkPinUsers = async () => {
+      const { count } = await supabase
+        .from("pin_users")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true);
+      
+      setHasPinUsers((count ?? 0) > 0);
+      setCheckingPinUsers(false);
+    };
+    checkPinUsers();
   }, []);
 
   // Redirect if already logged in
@@ -51,42 +47,29 @@ export default function AuthPage() {
       return;
     }
 
-    const storedHash = localStorage.getItem(PIN_STORAGE_KEY);
-    if (storedHash && hashPin(pin) === storedHash) {
-      setIsLoading(true);
+    setIsLoading(true);
+    
+    // Verify PIN against database
+    const result = await verifyPinLogin(pin);
+    
+    if (result.valid) {
+      // Sign in anonymously to get a valid session
       const { error } = await signInWithPin();
-      setIsLoading(false);
       
       if (error) {
         toast.error("Login failed / लॉगिन विफल");
+        setIsLoading(false);
         return;
       }
       
-      toast.success("🙏 स्वागत है! Welcome!");
+      toast.success(`🙏 स्वागत है ${result.userName}! Welcome!`);
       navigate("/dashboard");
     } else {
       toast.error("Invalid PIN / गलत पिन");
       setPin("");
     }
-  };
-
-  const handleSetPin = () => {
-    if (newPin.length !== 4) {
-      toast.error("PIN must be 4 digits / पिन 4 अंकों का होना चाहिए");
-      return;
-    }
-    if (newPin !== confirmPin) {
-      toast.error("PINs don't match / पिन मेल नहीं खाता");
-      return;
-    }
-
-    localStorage.setItem(PIN_STORAGE_KEY, hashPin(newPin));
-    localStorage.setItem(PIN_SET_KEY, "true");
-    setIsPinSet(true);
-    setIsSettingPin(false);
-    setNewPin("");
-    setConfirmPin("");
-    toast.success("PIN set successfully! / पिन सेट हो गया!");
+    
+    setIsLoading(false);
   };
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -154,55 +137,22 @@ export default function AuthPage() {
             <CardDescription>लॉगिन करें / Login to continue</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="pin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="pin" className="gap-2">
-                  <KeyRound className="w-4 h-4" /> PIN
-                </TabsTrigger>
-                <TabsTrigger value="email" className="gap-2">
-                  <Mail className="w-4 h-4" /> Email
-                </TabsTrigger>
-              </TabsList>
+            {checkingPinUsers ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : hasPinUsers ? (
+              <Tabs defaultValue="pin" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="pin" className="gap-2">
+                    <KeyRound className="w-4 h-4" /> PIN
+                  </TabsTrigger>
+                  <TabsTrigger value="email" className="gap-2">
+                    <Mail className="w-4 h-4" /> Admin
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="pin">
-                {!isPinSet || isSettingPin ? (
-                  <div className="space-y-4 text-center">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {isSettingPin ? "Set your 4-digit PIN / अपना 4 अंकों का पिन सेट करें" : "First time? Set your PIN / पहली बार? पिन सेट करें"}
-                    </p>
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm">New PIN / नया पिन</Label>
-                        <div className="flex justify-center mt-2">
-                          <InputOTP maxLength={4} value={newPin} onChange={setNewPin}>
-                            <InputOTPGroup>
-                              <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
-                              <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
-                              <InputOTPSlot index={2} className="w-12 h-12 text-lg" />
-                              <InputOTPSlot index={3} className="w-12 h-12 text-lg" />
-                            </InputOTPGroup>
-                          </InputOTP>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm">Confirm PIN / पिन पुष्टि करें</Label>
-                        <div className="flex justify-center mt-2">
-                          <InputOTP maxLength={4} value={confirmPin} onChange={setConfirmPin}>
-                            <InputOTPGroup>
-                              <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
-                              <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
-                              <InputOTPSlot index={2} className="w-12 h-12 text-lg" />
-                              <InputOTPSlot index={3} className="w-12 h-12 text-lg" />
-                            </InputOTPGroup>
-                          </InputOTP>
-                        </div>
-                      </div>
-                      <Button onClick={handleSetPin} className="w-full bg-[#8B0000] hover:bg-[#A52A2A]">
-                        Set PIN / पिन सेट करें
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
+                <TabsContent value="pin">
                   <div className="space-y-4 text-center">
                     <p className="text-sm text-muted-foreground mb-4">
                       Enter your 4-digit PIN / अपना 4 अंकों का पिन दर्ज करें
@@ -217,17 +167,76 @@ export default function AuthPage() {
                         </InputOTPGroup>
                       </InputOTP>
                     </div>
-                    <Button onClick={handlePinLogin} className="w-full bg-[#8B0000] hover:bg-[#A52A2A]">
-                      Login / लॉगिन <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                    <Button variant="link" size="sm" onClick={() => setIsSettingPin(true)} className="text-muted-foreground">
-                      Change PIN / पिन बदलें
+                    <Button 
+                      onClick={handlePinLogin} 
+                      className="w-full bg-[#8B0000] hover:bg-[#A52A2A]"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>Login / लॉगिन <ArrowRight className="w-4 h-4 ml-2" /></>
+                      )}
                     </Button>
                   </div>
-                )}
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="email">
+                <TabsContent value="email">
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <p className="text-sm text-muted-foreground text-center mb-2">
+                      Admin login to manage PINs / पिन प्रबंधन के लिए एडमिन लॉगिन
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="signin-email">ईमेल / Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="signin-email"
+                          name="email"
+                          type="email"
+                          placeholder="your@email.com"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signin-password">पासवर्ड / Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="signin-password"
+                          name="password"
+                          type="password"
+                          placeholder="••••••••"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full bg-[#8B0000] hover:bg-[#A52A2A]" disabled={isLoading}>
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          लॉगिन करें / Sign In <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            ) : (
+              // No PIN users exist - show only email login (first-time setup)
+              <div className="space-y-4">
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-center">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>First time setup:</strong> Sign in with email to create PIN users.
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
+                    पहली बार सेटअप: पिन उपयोगकर्ता बनाने के लिए ईमेल से लॉगिन करें।
+                  </p>
+                </div>
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">ईमेल / Email</Label>
@@ -267,8 +276,8 @@ export default function AuthPage() {
                     )}
                   </Button>
                 </form>
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
             
             <div className="mt-6 pt-4 border-t text-center">
               <p className="text-sm text-muted-foreground">
