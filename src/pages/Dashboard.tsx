@@ -4,6 +4,8 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useTrips } from "@/hooks/useTrips";
 import { useVehicles } from "@/hooks/useVehicles";
 import { useDrivers } from "@/hooks/useDrivers";
+import { useAuth } from "@/contexts/AuthContext";
+import { PinUserManager } from "@/components/PinUserManager";
 import {
   Truck,
   Users,
@@ -36,6 +38,7 @@ export default function Dashboard() {
   const { data: trips } = useTrips();
   const { data: vehicles } = useVehicles();
   const { data: drivers } = useDrivers();
+  const { isPinAuthenticated } = useAuth();
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
@@ -330,6 +333,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* PIN User Management - Only for email-signed-in users (not PIN users) */}
+      {!isPinAuthenticated && (
+        <div className="mt-8">
+          <PinUserManager />
+        </div>
+      )}
     </AppLayout>
   );
 }
