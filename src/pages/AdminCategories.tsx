@@ -115,27 +115,44 @@ export default function AdminCategories() {
 
   return (
     <AppLayout title="Manage Categories" subtitle="Configure all dropdown options">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Manage Categories</h1>
-            <p className="text-muted-foreground">Configure all dropdown options across your application</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Manage Categories</h1>
+            <p className="text-sm text-muted-foreground">Configure dropdown options</p>
           </div>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Settings2 className="h-5 w-5" />
               Category Management
             </CardTitle>
-            <CardDescription>
-              Add, edit, or remove categories that appear in dropdowns throughout the app
+            <CardDescription className="text-xs sm:text-sm">
+              Add, edit, or remove categories
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CategoryType)}>
-              <TabsList className="grid w-full grid-cols-5 mb-6">
+              {/* Mobile: Select dropdown instead of tabs */}
+              <div className="block sm:hidden mb-4">
+                <Select value={activeTab} onValueChange={(v) => setActiveTab(v as CategoryType)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select category type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background">
+                    {categoryTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Desktop: Tab list */}
+              <TabsList className="hidden sm:grid w-full grid-cols-5 mb-6">
                 {categoryTypes.map((type) => (
                   <TabsTrigger key={type.value} value={type.value} className="text-xs">
                     {type.label}
@@ -145,23 +162,23 @@ export default function AdminCategories() {
 
               {categoryTypes.map((type) => (
                 <TabsContent key={type.value} value={type.value}>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                      <h3 className="font-semibold">{type.label}</h3>
-                      <p className="text-sm text-muted-foreground">{type.description}</p>
+                      <h3 className="font-semibold text-sm sm:text-base">{type.label}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{type.description}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={seedDefaults} disabled={isSeeding}>
-                        {isSeeding ? "Adding..." : "Add Defaults"}
+                      <Button variant="outline" size="sm" onClick={seedDefaults} disabled={isSeeding} className="flex-1 sm:flex-none text-xs">
+                        {isSeeding ? "Adding..." : "Defaults"}
                       </Button>
                       <Dialog open={isAddOpen} onOpenChange={handleDialogClose}>
                         <DialogTrigger asChild>
-                          <Button size="sm" onClick={() => { setEditingCategory(null); setFormData({ name: "", description: "" }); }}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New
+                          <Button size="sm" onClick={() => { setEditingCategory(null); setFormData({ name: "", description: "" }); }} className="flex-1 sm:flex-none text-xs">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-[95vw] sm:max-w-md">
                           <DialogHeader>
                             <DialogTitle>{editingCategory ? "Edit" : "Add"} {currentTypeInfo?.label.slice(0, -1)}</DialogTitle>
                             <DialogDescription>
@@ -187,9 +204,9 @@ export default function AdminCategories() {
                               />
                             </div>
                           </div>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => handleDialogClose(false)}>Cancel</Button>
-                            <Button onClick={handleSubmit} disabled={createCategory.isPending || updateCategory.isPending}>
+                          <DialogFooter className="flex-col sm:flex-row gap-2">
+                            <Button variant="outline" onClick={() => handleDialogClose(false)} className="w-full sm:w-auto">Cancel</Button>
+                            <Button onClick={handleSubmit} disabled={createCategory.isPending || updateCategory.isPending} className="w-full sm:w-auto">
                               {createCategory.isPending || updateCategory.isPending ? "Saving..." : editingCategory ? "Update" : "Create"}
                             </Button>
                           </DialogFooter>
@@ -201,40 +218,70 @@ export default function AdminCategories() {
                   {isLoading ? (
                     <div className="text-center py-8 text-muted-foreground">Loading...</div>
                   ) : categories && categories.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                    <>
+                      {/* Mobile: Card layout */}
+                      <div className="block sm:hidden space-y-3">
                         {categories.map((category) => (
-                          <TableRow key={category.id}>
-                            <TableCell className="font-medium">{category.name}</TableCell>
-                            <TableCell className="text-muted-foreground">{category.description || "-"}</TableCell>
-                            <TableCell>
-                              <Badge variant={category.is_active ? "default" : "secondary"}>
+                          <div key={category.id} className="border rounded-lg p-3 bg-card">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{category.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{category.description || "No description"}</p>
+                              </div>
+                              <Badge variant={category.is_active ? "default" : "secondary"} className="text-xs shrink-0">
                                 {category.is_active ? "Active" : "Inactive"}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" onClick={() => handleEdit(category)}>
-                                <Pencil className="h-4 w-4" />
+                            </div>
+                            <div className="flex gap-2 mt-3 pt-3 border-t">
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(category)} className="flex-1 text-xs">
+                                <Pencil className="h-3 w-3 mr-1" /> Edit
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(category.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button variant="outline" size="sm" onClick={() => handleDelete(category.id)} className="flex-1 text-xs text-destructive">
+                                <Trash2 className="h-3 w-3 mr-1" /> Delete
                               </Button>
-                            </TableCell>
-                          </TableRow>
+                            </div>
+                          </div>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </div>
+
+                      {/* Desktop: Table layout */}
+                      <div className="hidden sm:block">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {categories.map((category) => (
+                              <TableRow key={category.id}>
+                                <TableCell className="font-medium">{category.name}</TableCell>
+                                <TableCell className="text-muted-foreground">{category.description || "-"}</TableCell>
+                                <TableCell>
+                                  <Badge variant={category.is_active ? "default" : "secondary"}>
+                                    {category.is_active ? "Active" : "Inactive"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(category)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(category.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   ) : (
-                    <div className="text-center py-8 border rounded-lg bg-muted/30">
-                      <p className="text-muted-foreground mb-2">No categories found</p>
+                    <div className="text-center py-6 sm:py-8 border rounded-lg bg-muted/30">
+                      <p className="text-muted-foreground mb-2 text-sm">No categories found</p>
                       <Button variant="outline" size="sm" onClick={seedDefaults} disabled={isSeeding}>
                         {isSeeding ? "Adding..." : `Add Default ${type.label}`}
                       </Button>
