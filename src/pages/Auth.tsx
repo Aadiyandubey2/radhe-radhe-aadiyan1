@@ -1,19 +1,22 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import logoImg from "@/assets/logo.png";
 
 // Authorized email for this application
 const AUTHORIZED_EMAIL = "shankemandhan24@gmail.com";
+const RECOMMENDED_PASSWORD = "RadheRadhe@2024";
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isSettingUp, setIsSettingUp] = useState(false);
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
 
@@ -23,6 +26,47 @@ export default function AuthPage() {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  const handleFirstTimeSetup = async () => {
+    setIsSettingUp(true);
+    
+    // First try to sign in (in case account already exists)
+    const { error: signInError } = await signIn(AUTHORIZED_EMAIL, RECOMMENDED_PASSWORD);
+    
+    if (!signInError) {
+      toast.success("🙏 स्वागत है! Welcome!");
+      navigate("/dashboard");
+      setIsSettingUp(false);
+      return;
+    }
+
+    // If sign in fails, create the account
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: AUTHORIZED_EMAIL,
+      password: RECOMMENDED_PASSWORD,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`
+      }
+    });
+
+    if (signUpError) {
+      toast.error("Setup failed / सेटअप विफल: " + signUpError.message);
+      setIsSettingUp(false);
+      return;
+    }
+
+    // Auto sign in after signup
+    const { error: finalSignInError } = await signIn(AUTHORIZED_EMAIL, RECOMMENDED_PASSWORD);
+    
+    if (finalSignInError) {
+      toast.error("Please try signing in manually / कृपया मैन्युअल रूप से साइन इन करें");
+    } else {
+      toast.success("🙏 खाता बनाया गया! Account created successfully!");
+      navigate("/dashboard");
+    }
+    
+    setIsSettingUp(false);
+  };
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -140,8 +184,34 @@ export default function AuthPage() {
               </Button>
             </form>
             
-            <div className="mt-6 pt-4 border-t text-center">
-              <p className="text-sm text-muted-foreground">
+            <div className="mt-6 pt-4 border-t space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">या / or</span>
+                </div>
+              </div>
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleFirstTimeSetup}
+                disabled={isSettingUp}
+              >
+                {isSettingUp ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    पहली बार सेटअप / First Time Setup
+                  </>
+                )}
+              </Button>
+              
+              <p className="text-xs text-center text-muted-foreground">
                 व्यक्तिगत उपयोग के लिए / For personal business use
               </p>
             </div>
