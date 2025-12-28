@@ -2,11 +2,12 @@ import { ReactNode, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { Moon, Sun, Menu } from "lucide-react";
+import { Moon, Sun, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -84,9 +85,21 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
             
             <div className="flex items-center gap-2 sm:gap-4">
               {/* Desktop search */}
-              <div className="hidden lg:block">
+              <div className="hidden md:block">
                 <GlobalSearch />
               </div>
+
+              {/* Mobile search popover */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Search className="w-5 h-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-2" align="end">
+                  <GlobalSearch />
+                </PopoverContent>
+              </Popover>
 
               <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}

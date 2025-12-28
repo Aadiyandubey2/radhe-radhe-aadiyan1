@@ -1,11 +1,11 @@
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useTrips } from "@/hooks/useTrips";
 import { useVehicles } from "@/hooks/useVehicles";
 import { useDrivers } from "@/hooks/useDrivers";
-import { useAuth } from "@/contexts/AuthContext";
-import { PinUserManager } from "@/components/PinUserManager";
+import { OnboardingGuide } from "@/components/OnboardingGuide";
 import {
   Truck,
   Users,
@@ -38,7 +38,21 @@ export default function Dashboard() {
   const { data: trips } = useTrips();
   const { data: vehicles } = useVehicles();
   const { data: drivers } = useDrivers();
-  const { isPinAuthenticated } = useAuth();
+  
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    // Show onboarding if user hasn't completed it
+    const hasCompletedOnboarding = localStorage.getItem("rrt_onboarding_complete");
+    if (!hasCompletedOnboarding) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem("rrt_onboarding_complete", "true");
+    setShowOnboarding(false);
+  };
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
@@ -76,6 +90,9 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard" subtitle="Welcome back! Here's your fleet overview">
+      {/* Onboarding Guide */}
+      {showOnboarding && <OnboardingGuide onComplete={handleOnboardingComplete} />}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard
@@ -333,13 +350,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* PIN User Management - Only for email-signed-in users (not PIN users) */}
-      {!isPinAuthenticated && (
-        <div className="mt-8">
-          <PinUserManager />
-        </div>
-      )}
     </AppLayout>
   );
 }
