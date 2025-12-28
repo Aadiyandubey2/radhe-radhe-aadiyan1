@@ -2,16 +2,11 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-const PIN_AUTH_KEY = "rrt_pin_authenticated";
-
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  isPinAuthenticated: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signInWithPin: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -21,13 +16,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPinAuthenticated, setIsPinAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check PIN authentication
-    const pinAuth = localStorage.getItem(PIN_AUTH_KEY) === "true";
-    setIsPinAuthenticated(pinAuth);
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -45,23 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-    
-    return { error: error as Error | null };
-  };
-
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -71,24 +44,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
-  // Sign in with anonymous user for PIN authentication
-  const signInWithPin = async () => {
-    const { error } = await supabase.auth.signInAnonymously();
-    if (!error) {
-      localStorage.setItem(PIN_AUTH_KEY, "true");
-      setIsPinAuthenticated(true);
-    }
-    return { error: error as Error | null };
-  };
-
   const signOut = async () => {
-    localStorage.removeItem(PIN_AUTH_KEY);
-    setIsPinAuthenticated(false);
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isPinAuthenticated, signUp, signIn, signInWithPin, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

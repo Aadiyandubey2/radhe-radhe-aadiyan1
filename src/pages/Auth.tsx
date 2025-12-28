@@ -5,80 +5,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, Lock, ArrowRight, Loader2, KeyRound } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import logoImg from "@/assets/logo.png";
-import { verifyPinLogin } from "@/hooks/usePinUsers";
-import { supabase } from "@/integrations/supabase/client";
+
+// Authorized email for this application
+const AUTHORIZED_EMAIL = "shankemandhan24@gmail.com";
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [pin, setPin] = useState("");
-  const [hasPinUsers, setHasPinUsers] = useState(false);
-  const [checkingPinUsers, setCheckingPinUsers] = useState(true);
-  const { signIn, signInWithPin, user } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
 
-  // Check if any PIN users exist in the system
-  useEffect(() => {
-    const checkPinUsers = async () => {
-      const { count } = await supabase
-        .from("pin_users")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true);
-      
-      setHasPinUsers((count ?? 0) > 0);
-      setCheckingPinUsers(false);
-    };
-    checkPinUsers();
-  }, []);
-
   // Redirect if already logged in
-  if (user) {
-    navigate("/dashboard");
-    return null;
-  }
-
-  const handlePinLogin = async () => {
-    if (pin.length !== 4) {
-      toast.error("Please enter 4-digit PIN / 4 अंकों का पिन दर्ज करें");
-      return;
-    }
-
-    setIsLoading(true);
-    
-    // Verify PIN against database
-    const result = await verifyPinLogin(pin);
-    
-    if (result.valid) {
-      // Sign in anonymously to get a valid session
-      const { error } = await signInWithPin();
-      
-      if (error) {
-        toast.error("Login failed / लॉगिन विफल");
-        setIsLoading(false);
-        return;
-      }
-      
-      toast.success(`🙏 स्वागत है ${result.userName}! Welcome!`);
+  useEffect(() => {
+    if (user) {
       navigate("/dashboard");
-    } else {
-      toast.error("Invalid PIN / गलत पिन");
-      setPin("");
     }
-    
-    setIsLoading(false);
-  };
+  }, [user, navigate]);
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
+    const email = (formData.get("email") as string).toLowerCase().trim();
     const password = formData.get("password") as string;
+
+    // Check if email is authorized
+    if (email !== AUTHORIZED_EMAIL) {
+      toast.error("Unauthorized access / अनधिकृत पहुँच");
+      setIsLoading(false);
+      return;
+    }
 
     const { error } = await signIn(email, password);
 
@@ -91,6 +50,10 @@ export default function AuthPage() {
 
     setIsLoading(false);
   };
+
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -137,147 +100,45 @@ export default function AuthPage() {
             <CardDescription>लॉगिन करें / Login to continue</CardDescription>
           </CardHeader>
           <CardContent>
-            {checkingPinUsers ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : hasPinUsers ? (
-              <Tabs defaultValue="pin" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="pin" className="gap-2">
-                    <KeyRound className="w-4 h-4" /> PIN
-                  </TabsTrigger>
-                  <TabsTrigger value="email" className="gap-2">
-                    <Mail className="w-4 h-4" /> Admin
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="pin">
-                  <div className="space-y-4 text-center">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Enter your 4-digit PIN / अपना 4 अंकों का पिन दर्ज करें
-                    </p>
-                    <div className="flex justify-center">
-                      <InputOTP maxLength={4} value={pin} onChange={setPin}>
-                        <InputOTPGroup>
-                          <InputOTPSlot index={0} className="w-14 h-14 text-xl" />
-                          <InputOTPSlot index={1} className="w-14 h-14 text-xl" />
-                          <InputOTPSlot index={2} className="w-14 h-14 text-xl" />
-                          <InputOTPSlot index={3} className="w-14 h-14 text-xl" />
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                    <Button 
-                      onClick={handlePinLogin} 
-                      className="w-full bg-[#8B0000] hover:bg-[#A52A2A]"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>Login / लॉगिन <ArrowRight className="w-4 h-4 ml-2" /></>
-                      )}
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="email">
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <p className="text-sm text-muted-foreground text-center mb-2">
-                      Admin login to manage PINs / पिन प्रबंधन के लिए एडमिन लॉगिन
-                    </p>
-                    <div className="space-y-2">
-                      <Label htmlFor="signin-email">ईमेल / Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="signin-email"
-                          name="email"
-                          type="email"
-                          placeholder="your@email.com"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signin-password">पासवर्ड / Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="signin-password"
-                          name="password"
-                          type="password"
-                          placeholder="••••••••"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full bg-[#8B0000] hover:bg-[#A52A2A]" disabled={isLoading}>
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          लॉगिन करें / Sign In <ArrowRight className="w-4 h-4 ml-2" />
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-            ) : (
-              // No PIN users exist - show only email login (first-time setup)
-              <div className="space-y-4">
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-center">
-                  <p className="text-sm text-amber-800 dark:text-amber-200">
-                    <strong>First time setup:</strong> Sign in with email to create PIN users.
-                  </p>
-                  <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
-                    पहली बार सेटअप: पिन उपयोगकर्ता बनाने के लिए ईमेल से लॉगिन करें।
-                  </p>
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="signin-email">ईमेल / Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="signin-email"
+                    name="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    className="pl-10"
+                    required
+                  />
                 </div>
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">ईमेल / Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signin-email"
-                        name="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-password">पासवर्ड / Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signin-password"
-                        name="password"
-                        type="password"
-                        placeholder="••••••••"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full bg-[#8B0000] hover:bg-[#A52A2A]" disabled={isLoading}>
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        लॉगिन करें / Sign In <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
-                    )}
-                  </Button>
-                </form>
               </div>
-            )}
+              <div className="space-y-2">
+                <Label htmlFor="signin-password">पासवर्ड / Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="signin-password"
+                    name="password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="w-full bg-[#8B0000] hover:bg-[#A52A2A]" disabled={isLoading}>
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    लॉगिन करें / Sign In <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
+              </Button>
+            </form>
             
             <div className="mt-6 pt-4 border-t text-center">
               <p className="text-sm text-muted-foreground">
