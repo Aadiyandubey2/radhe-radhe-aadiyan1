@@ -52,7 +52,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background w-full">
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <AppSidebar />
@@ -61,7 +61,7 @@ export function AppLayout({ children, title, subtitle }: AppLayoutProps) {
       {/* Mobile Sidebar */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-72">
-          <AppSidebar />
+          <AppSidebar isMobile onClose={() => setMobileMenuOpen(false)} />
         </SheetContent>
       </Sheet>
 

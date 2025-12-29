@@ -31,20 +31,34 @@ const navigation = [
   { name: "Admin", href: "/admin/categories", icon: Shield },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  isMobile?: boolean;
+  onClose?: () => void;
+}
+
+export function AppSidebar({ isMobile = false, onClose }: AppSidebarProps) {
   const location = useLocation();
   const { signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
+  const handleNavClick = () => {
+    if (isMobile && onClose) {
+      onClose();
+    }
+  };
+
   return (
     <aside
       className={cn(
-        "glass-dark h-screen sticky top-0 flex flex-col transition-all duration-300",
-        collapsed ? "w-20" : "w-64"
+        "flex flex-col transition-all duration-300",
+        isMobile 
+          ? "h-full w-full bg-sidebar" 
+          : "glass-dark h-screen sticky top-0",
+        !isMobile && (collapsed ? "w-20" : "w-64")
       )}
     >
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        {!collapsed && (
+        {(!collapsed || isMobile) && (
           <div className="flex items-center gap-3">
             <img src={logoImg} alt="Radhe Radhe Transport" className="w-10 h-10 rounded-xl object-cover" />
             <div>
@@ -53,27 +67,30 @@ export function AppSidebar() {
             </div>
           </div>
         )}
-        {collapsed && (
+        {collapsed && !isMobile && (
           <img src={logoImg} alt="Radhe Radhe" className="w-10 h-10 mx-auto rounded-xl object-cover" />
         )}
       </div>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-16 w-6 h-6 rounded-full bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
-      >
-        {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-      </Button>
+      {!isMobile && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-16 w-6 h-6 rounded-full bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </Button>
+      )}
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = location.pathname === item.href;
           return (
             <Link
               key={item.name}
               to={item.href}
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                 isActive
@@ -82,7 +99,7 @@ export function AppSidebar() {
               )}
             >
               <item.icon className={cn("w-5 h-5 shrink-0", isActive && "animate-pulse-slow")} />
-              {!collapsed && <span className="font-medium">{item.name}</span>}
+              {(!collapsed || isMobile) && <span className="font-medium">{item.name}</span>}
             </Link>
           );
         })}
@@ -90,14 +107,17 @@ export function AppSidebar() {
 
       <div className="p-4 border-t border-sidebar-border">
         <button
-          onClick={signOut}
+          onClick={() => {
+            signOut();
+            handleNavClick();
+          }}
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:bg-destructive/20 hover:text-destructive transition-colors",
-            collapsed && "justify-center"
+            collapsed && !isMobile && "justify-center"
           )}
         >
           <LogOut className="w-5 h-5" />
-          {!collapsed && <span className="font-medium">Sign Out</span>}
+          {(!collapsed || isMobile) && <span className="font-medium">Sign Out</span>}
         </button>
       </div>
     </aside>
