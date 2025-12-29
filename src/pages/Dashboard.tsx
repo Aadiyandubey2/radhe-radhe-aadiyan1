@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAnalyticsWithRange } from "@/hooks/useAnalyticsWithRange";
 import { useTrips } from "@/hooks/useTrips";
 import { useVehicles } from "@/hooks/useVehicles";
 import { useDrivers } from "@/hooks/useDrivers";
 import { OnboardingGuide } from "@/components/OnboardingGuide";
+import { TimeRangeSelector, TimeRange } from "@/components/TimeRangeSelector";
 import {
   Truck,
   Users,
@@ -15,9 +17,11 @@ import {
   TrendingDown,
   Clock,
   CheckCircle,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   AreaChart,
   Area,
@@ -40,6 +44,8 @@ export default function Dashboard() {
   const { data: drivers } = useDrivers();
   
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>("monthly");
+  const { data: trendData } = useAnalyticsWithRange(timeRange);
 
   useEffect(() => {
     // Show onboarding if user hasn't completed it
@@ -52,6 +58,11 @@ export default function Dashboard() {
   const handleOnboardingComplete = () => {
     localStorage.setItem("rrt_onboarding_complete", "true");
     setShowOnboarding(false);
+  };
+
+  const handleRestartTutorial = () => {
+    localStorage.removeItem("rrt_onboarding_complete");
+    setShowOnboarding(true);
   };
 
   const formatCurrency = (value: number) =>
@@ -92,6 +103,19 @@ export default function Dashboard() {
     <AppLayout title="Dashboard" subtitle="Welcome back! Here's your fleet overview">
       {/* Onboarding Guide */}
       {showOnboarding && <OnboardingGuide onComplete={handleOnboardingComplete} />}
+
+      {/* Restart Tutorial Button */}
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRestartTutorial}
+          className="gap-2"
+        >
+          <RotateCcw className="w-4 h-4" />
+          Restart Tutorial
+        </Button>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -150,14 +174,15 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Revenue Trend */}
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="font-display">Revenue & Expenses Trend</CardTitle>
+            <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           </CardHeader>
           <CardContent>
             <div className="h-80">
-              {(analytics?.monthlyTrends?.length || 0) > 0 ? (
+              {(trendData?.length || 0) > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={analytics?.monthlyTrends || []}>
+                  <AreaChart data={trendData || []}>
                     <defs>
                       <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3} />
@@ -169,8 +194,8 @@ export default function Dashboard() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" className="text-muted-foreground" />
-                    <YAxis className="text-muted-foreground" />
+                    <XAxis dataKey="label" className="text-muted-foreground" tick={{ fontSize: 11 }} />
+                    <YAxis className="text-muted-foreground" tick={{ fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",

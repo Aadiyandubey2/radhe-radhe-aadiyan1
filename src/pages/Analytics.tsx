@@ -1,12 +1,18 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAnalyticsWithRange } from "@/hooks/useAnalyticsWithRange";
+import { TimeRangeSelector, TimeRange } from "@/components/TimeRangeSelector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 const COLORS = ["hsl(217, 91%, 60%)", "hsl(262, 83%, 58%)", "hsl(142, 76%, 36%)", "hsl(38, 92%, 50%)", "hsl(0, 84%, 60%)", "hsl(180, 70%, 45%)", "hsl(320, 70%, 50%)"];
 
 export default function Analytics() {
   const { data: analytics, isLoading } = useAnalytics();
+  const [timeRange, setTimeRange] = useState<TimeRange>("monthly");
+  const { data: trendData } = useAnalyticsWithRange(timeRange);
+
   const formatCurrency = (v: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
   const formatShort = (v: number) => {
     if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
@@ -24,23 +30,26 @@ export default function Analytics() {
     );
   }
 
-  const hasMonthlyData = (analytics?.monthlyTrends?.length || 0) > 0;
+  const hasTrendData = (trendData?.length || 0) > 0;
   const hasExpenseData = (analytics?.expensesByCategory?.length || 0) > 0;
   const hasVehicleData = (analytics?.vehicleWiseProfits?.length || 0) > 0;
 
   return (
     <AppLayout title="Analytics" subtitle="Business insights / व्यापार विश्लेषण">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Revenue vs Expenses */}
+        {/* Revenue vs Expenses */}
         <Card>
-          <CardHeader><CardTitle className="text-base sm:text-lg">Monthly Revenue vs Expenses / मासिक आय बनाम खर्च</CardTitle></CardHeader>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-base sm:text-lg">Revenue vs Expenses / आय बनाम खर्च</CardTitle>
+            <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+          </CardHeader>
           <CardContent>
             <div className="h-64 sm:h-72">
-              {hasMonthlyData ? (
+              {hasTrendData ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics?.monthlyTrends || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <BarChart data={trendData || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={formatShort} tick={{ fontSize: 11 }} />
                     <Tooltip 
                       contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} 
@@ -53,7 +62,7 @@ export default function Analytics() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground text-center">
-                  <p>Add income and expenses to see monthly trends<br/>आय और खर्च जोड़ें</p>
+                  <p>Add income and expenses to see trends<br/>आय और खर्च जोड़ें</p>
                 </div>
               )}
             </div>
