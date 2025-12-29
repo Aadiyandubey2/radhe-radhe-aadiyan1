@@ -1,22 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Lock, ArrowRight, Loader2, UserPlus } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import logoImg from "@/assets/logo.png";
 
 // Authorized email for this application
 const AUTHORIZED_EMAIL = "shankemandhan24@gmail.com";
-const RECOMMENDED_PASSWORD = "RadheRadhe@2024";
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [isSettingUp, setIsSettingUp] = useState(false);
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
 
@@ -26,47 +23,6 @@ export default function AuthPage() {
       navigate("/dashboard");
     }
   }, [user, navigate]);
-
-  const handleFirstTimeSetup = async () => {
-    setIsSettingUp(true);
-    
-    // First try to sign in (in case account already exists)
-    const { error: signInError } = await signIn(AUTHORIZED_EMAIL, RECOMMENDED_PASSWORD);
-    
-    if (!signInError) {
-      toast.success("🙏 स्वागत है! Welcome!");
-      navigate("/dashboard");
-      setIsSettingUp(false);
-      return;
-    }
-
-    // If sign in fails, create the account
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: AUTHORIZED_EMAIL,
-      password: RECOMMENDED_PASSWORD,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`
-      }
-    });
-
-    if (signUpError) {
-      toast.error("Setup failed / सेटअप विफल: " + signUpError.message);
-      setIsSettingUp(false);
-      return;
-    }
-
-    // Auto sign in after signup
-    const { error: finalSignInError } = await signIn(AUTHORIZED_EMAIL, RECOMMENDED_PASSWORD);
-    
-    if (finalSignInError) {
-      toast.error("Please try signing in manually / कृपया मैन्युअल रूप से साइन इन करें");
-    } else {
-      toast.success("🙏 खाता बनाया गया! Account created successfully!");
-      navigate("/dashboard");
-    }
-    
-    setIsSettingUp(false);
-  };
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -78,7 +34,9 @@ export default function AuthPage() {
 
     // Check if email is authorized
     if (email !== AUTHORIZED_EMAIL) {
-      toast.error("Unauthorized access / अनधिकृत पहुँच");
+      toast.error("Unauthorized access / अनधिकृत पहुँच", {
+        description: "Only the authorized email can access this application."
+      });
       setIsLoading(false);
       return;
     }
@@ -104,28 +62,43 @@ export default function AuthPage() {
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#8B0000] via-[#A52A2A] to-[#CD5C5C] relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+        
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-20 -left-20 w-64 h-64 bg-white/5 rounded-full animate-pulse" style={{ animationDuration: '4s' }} />
+          <div className="absolute top-1/4 right-10 w-32 h-32 bg-white/5 rounded-full animate-pulse" style={{ animationDuration: '3s', animationDelay: '1s' }} />
+          <div className="absolute bottom-20 left-1/4 w-48 h-48 bg-white/5 rounded-full animate-pulse" style={{ animationDuration: '5s', animationDelay: '2s' }} />
+        </div>
+        
         <div className="relative z-10 flex flex-col justify-center items-center p-12 text-white">
-          <img src={logoImg} alt="Radhe Radhe Transport" className="w-24 h-24 rounded-2xl mb-8 shadow-2xl" />
-          <h1 className="text-4xl font-display font-bold mb-2 text-center">🙏 राधे राधे</h1>
-          <h2 className="text-2xl font-semibold mb-4 text-center text-white/90">Transport Service</h2>
-          <p className="text-lg text-white/70 text-center max-w-md mb-8">
+          <div className="animate-fade-in">
+            <img src={logoImg} alt="Radhe Radhe Transport" className="w-24 h-24 rounded-2xl mb-8 shadow-2xl mx-auto" />
+          </div>
+          <h1 className="text-4xl font-display font-bold mb-2 text-center animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            🙏 राधे राधे
+          </h1>
+          <h2 className="text-2xl font-semibold mb-4 text-center text-white/90 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            Transport Service
+          </h2>
+          <p className="text-lg text-white/70 text-center max-w-md mb-8 animate-fade-in" style={{ animationDelay: '0.3s' }}>
             विश्वसनीय परिवहन सेवा / Trusted Transport Solution
           </p>
           <div className="grid grid-cols-2 gap-6 w-full max-w-md">
             {[
-              "वाहन प्रबंधन / Vehicles",
-              "यात्रा ट्रैकिंग / Trips",
-              "वित्तीय विश्लेषण / Finance",
-              "चालक प्रबंधन / Drivers",
-              "ग्राहक बिलिंग / Billing",
-              "रिपोर्ट्स / Reports",
+              { text: "वाहन प्रबंधन / Vehicles", delay: "0.4s" },
+              { text: "यात्रा ट्रैकिंग / Trips", delay: "0.5s" },
+              { text: "वित्तीय विश्लेषण / Finance", delay: "0.6s" },
+              { text: "चालक प्रबंधन / Drivers", delay: "0.7s" },
+              { text: "ग्राहक बिलिंग / Billing", delay: "0.8s" },
+              { text: "रिपोर्ट्स / Reports", delay: "0.9s" },
             ].map((feature) => (
               <div
-                key={feature}
-                className="flex items-center gap-2 text-sm text-white/80"
+                key={feature.text}
+                className="flex items-center gap-2 text-sm text-white/80 animate-fade-in"
+                style={{ animationDelay: feature.delay }}
               >
-                <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                {feature}
+                <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                {feature.text}
               </div>
             ))}
           </div>
@@ -135,7 +108,7 @@ export default function AuthPage() {
 
       {/* Right Panel - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <Card className="w-full max-w-md border-0 shadow-xl">
+        <Card className="w-full max-w-md border-0 shadow-xl animate-scale-in">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
               <img src={logoImg} alt="Radhe Radhe" className="w-16 h-16 rounded-xl" />
@@ -184,35 +157,9 @@ export default function AuthPage() {
               </Button>
             </form>
             
-            <div className="mt-6 pt-4 border-t space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">या / or</span>
-                </div>
-              </div>
-              
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleFirstTimeSetup}
-                disabled={isSettingUp}
-              >
-                {isSettingUp ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    पहली बार सेटअप / First Time Setup
-                  </>
-                )}
-              </Button>
-              
+            <div className="mt-6 pt-4 border-t">
               <p className="text-xs text-center text-muted-foreground">
-                व्यक्तिगत उपयोग के लिए / For personal business use
+                व्यक्तिगत उपयोग के लिए / For personal business use only
               </p>
             </div>
           </CardContent>
