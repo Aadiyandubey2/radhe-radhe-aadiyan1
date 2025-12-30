@@ -50,7 +50,7 @@ export function AppSidebar({ isMobile = false, onClose }: AppSidebarProps) {
   return (
     <aside
       className={cn(
-        "flex flex-col transition-all duration-300",
+        "flex flex-col transition-all duration-300 relative",
         isMobile 
           ? "h-full w-full bg-sidebar" 
           : "glass-dark h-screen sticky top-0",
@@ -77,7 +77,7 @@ export function AppSidebar({ isMobile = false, onClose }: AppSidebarProps) {
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-16 w-6 h-6 rounded-full bg-sidebar border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent z-50 shadow-md hidden md:flex items-center justify-center"
+          className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-background border border-border text-foreground hover:bg-accent z-[60] shadow-lg flex items-center justify-center"
         >
           {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
         </Button>
