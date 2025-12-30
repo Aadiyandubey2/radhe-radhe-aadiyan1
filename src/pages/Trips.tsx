@@ -4,17 +4,20 @@ import { useVehicles } from "@/hooks/useVehicles";
 import { useDrivers } from "@/hooks/useDrivers";
 import { useClients } from "@/hooks/useClients";
 import { useCategories } from "@/hooks/useCategories";
+import { useCreateIncome } from "@/hooks/useIncome";
+import { useCreateExpense } from "@/hooks/useExpenses";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { TripMap } from "@/components/TripMap";
 import { LocationPicker } from "@/components/LocationPicker";
-import { Plus, Route, MapPin, Trash2, Play, CheckCircle, Edit, Map, FileText, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { calculateHaversineDistance } from "@/hooks/useDistanceCalculation";
+import { Plus, Route, MapPin, Trash2, Play, CheckCircle, Edit, Map, FileText, Loader2, Calculator } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -27,11 +30,16 @@ export default function Trips() {
   const createTrip = useCreateTrip();
   const updateTrip = useUpdateTrip();
   const deleteTrip = useDeleteTrip();
+  const createIncome = useCreateIncome();
+  const createExpense = useCreateExpense();
+  
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [generatingInvoice, setGeneratingInvoice] = useState<string | null>(null);
+  const [completingTrip, setCompletingTrip] = useState(false);
 
   // Form state for location picker
   const [pickupLocation, setPickupLocation] = useState("");
@@ -40,6 +48,26 @@ export default function Trips() {
   const [dropLocation, setDropLocation] = useState("");
   const [dropLat, setDropLat] = useState<number | null>(null);
   const [dropLng, setDropLng] = useState<number | null>(null);
+  const [calculatedDistance, setCalculatedDistance] = useState<number | null>(null);
+  const distanceInputRef = useRef<HTMLInputElement>(null);
+
+  // Complete journey form state
+  const [tripExpenses, setTripExpenses] = useState<{ fuel: number; toll: number; other: number }>({
+    fuel: 0,
+    toll: 0,
+    other: 0,
+  });
+
+  // Auto-calculate distance when coordinates change
+  useEffect(() => {
+    if (pickupLat && pickupLng && dropLat && dropLng) {
+      const distance = calculateHaversineDistance(pickupLat, pickupLng, dropLat, dropLng);
+      setCalculatedDistance(distance);
+      if (distanceInputRef.current) {
+        distanceInputRef.current.value = String(distance);
+      }
+    }
+  }, [pickupLat, pickupLng, dropLat, dropLng]);
 
   const resetLocationForm = () => {
     setPickupLocation("");
@@ -48,6 +76,7 @@ export default function Trips() {
     setDropLocation("");
     setDropLat(null);
     setDropLng(null);
+    setCalculatedDistance(null);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -65,7 +94,7 @@ export default function Trips() {
       client_id: formData.get("client_id") as string || null,
       goods_type: formData.get("goods_type") as string || null,
       weight: formData.get("weight") as string || null,
-      distance_km: formData.get("distance") ? parseFloat(formData.get("distance") as string) : null,
+      distance_km: formData.get("distance") ? parseFloat(formData.get("distance") as string) : calculatedDistance,
       fare_amount: formData.get("fare") ? parseFloat(formData.get("fare") as string) : 0,
       advance_amount: formData.get("advance") ? parseFloat(formData.get("advance") as string) : 0,
       start_date: formData.get("start_date") as string || null,
@@ -94,7 +123,7 @@ export default function Trips() {
       client_id: formData.get("client_id") as string || null,
       goods_type: formData.get("goods_type") as string || null,
       weight: formData.get("weight") as string || null,
-      distance_km: formData.get("distance") ? parseFloat(formData.get("distance") as string) : null,
+      distance_km: formData.get("distance") ? parseFloat(formData.get("distance") as string) : calculatedDistance,
       fare_amount: formData.get("fare") ? parseFloat(formData.get("fare") as string) : 0,
       advance_amount: formData.get("advance") ? parseFloat(formData.get("advance") as string) : 0,
       notes: formData.get("notes") as string || null,
@@ -112,7 +141,90 @@ export default function Trips() {
     setDropLocation(trip.drop_location);
     setDropLat(trip.drop_lat);
     setDropLng(trip.drop_lng);
+    setCalculatedDistance(trip.distance_km);
     setEditOpen(true);
+  };
+
+  const openCompleteDialog = (trip: any) => {
+    setSelectedTrip(trip);
+    setTripExpenses({ fuel: 0, toll: 0, other: 0 });
+    setCompleteDialogOpen(true);
+  };
+
+  const handleCompleteTrip = async () => {
+    if (!selectedTrip) return;
+    
+    setCompletingTrip(true);
+    try {
+      // 1. Update trip status to completed
+      await updateTrip.mutateAsync({
+        id: selectedTrip.id,
+        status: "completed",
+        end_date: new Date().toISOString(),
+        payment_status: "completed",
+      });
+
+      // 2. Add income record for the trip fare
+      if (selectedTrip.fare_amount > 0) {
+        await createIncome.mutateAsync({
+          amount: selectedTrip.fare_amount,
+          payment_date: new Date().toISOString().split("T")[0],
+          payment_method: "cash",
+          trip_id: selectedTrip.id,
+          client_id: selectedTrip.client_id,
+          notes: `Trip fare for ${selectedTrip.trip_number}`,
+          reference_number: null,
+        });
+      }
+
+      // 3. Add expense records
+      if (tripExpenses.fuel > 0) {
+        await createExpense.mutateAsync({
+          category: "fuel",
+          amount: tripExpenses.fuel,
+          expense_date: new Date().toISOString().split("T")[0],
+          trip_id: selectedTrip.id,
+          vehicle_id: selectedTrip.vehicle_id,
+          driver_id: selectedTrip.driver_id,
+          description: `Fuel expense for ${selectedTrip.trip_number}`,
+          receipt_url: null,
+        });
+      }
+
+      if (tripExpenses.toll > 0) {
+        await createExpense.mutateAsync({
+          category: "toll_parking",
+          amount: tripExpenses.toll,
+          expense_date: new Date().toISOString().split("T")[0],
+          trip_id: selectedTrip.id,
+          vehicle_id: selectedTrip.vehicle_id,
+          driver_id: selectedTrip.driver_id,
+          description: `Toll & parking for ${selectedTrip.trip_number}`,
+          receipt_url: null,
+        });
+      }
+
+      if (tripExpenses.other > 0) {
+        await createExpense.mutateAsync({
+          category: "miscellaneous",
+          amount: tripExpenses.other,
+          expense_date: new Date().toISOString().split("T")[0],
+          trip_id: selectedTrip.id,
+          vehicle_id: selectedTrip.vehicle_id,
+          driver_id: selectedTrip.driver_id,
+          description: `Other expenses for ${selectedTrip.trip_number}`,
+          receipt_url: null,
+        });
+      }
+
+      toast.success("Trip completed! Income and expenses added to finance.");
+      setCompleteDialogOpen(false);
+      setSelectedTrip(null);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to complete trip");
+    } finally {
+      setCompletingTrip(false);
+    }
   };
 
   const generateInvoice = async (tripId: string) => {
@@ -212,7 +324,24 @@ export default function Trips() {
           </Select>
         </div>
         <div><Label>Weight</Label><Input name="weight" placeholder="20 Tons" defaultValue={trip?.weight} /></div>
-        <div><Label>Distance (km)</Label><Input name="distance" type="number" defaultValue={trip?.distance_km} /></div>
+        <div>
+          <Label className="flex items-center gap-2">
+            Distance (km)
+            {calculatedDistance && (
+              <span className="text-xs text-success flex items-center gap-1">
+                <Calculator className="w-3 h-3" />
+                Auto-calculated
+              </span>
+            )}
+          </Label>
+          <Input 
+            ref={distanceInputRef} 
+            name="distance" 
+            type="number" 
+            defaultValue={trip?.distance_km || calculatedDistance || ""} 
+            placeholder={calculatedDistance ? String(calculatedDistance) : "Enter distance"}
+          />
+        </div>
         <div><Label>Fare Amount (₹)</Label><Input name="fare" type="number" defaultValue={trip?.fare_amount} /></div>
         <div><Label>Advance (₹)</Label><Input name="advance" type="number" defaultValue={trip?.advance_amount} /></div>
         {!trip && <div><Label>Start Date</Label><Input name="start_date" type="datetime-local" /></div>}
@@ -244,6 +373,91 @@ export default function Trips() {
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Edit Trip</DialogTitle></DialogHeader>
           {selectedTrip && <TripForm trip={selectedTrip} onSubmit={handleEdit} isPending={updateTrip.isPending} buttonText="Save Changes" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Journey Dialog */}
+      <Dialog open={completeDialogOpen} onOpenChange={(o) => { setCompleteDialogOpen(o); if (!o) setSelectedTrip(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-success" />
+              Complete Journey
+            </DialogTitle>
+            <DialogDescription>
+              Trip: {selectedTrip?.trip_number}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-success/10 border border-success/20">
+              <p className="text-sm text-muted-foreground">Trip Fare (Income)</p>
+              <p className="text-xl font-bold text-success">{formatCurrency(selectedTrip?.fare_amount || 0)}</p>
+            </div>
+            
+            <div className="space-y-3">
+              <p className="font-medium text-sm">Trip Expenses</p>
+              <div>
+                <Label>Fuel Expense (₹)</Label>
+                <Input
+                  type="number"
+                  value={tripExpenses.fuel}
+                  onChange={(e) => setTripExpenses(prev => ({ ...prev, fuel: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label>Toll & Parking (₹)</Label>
+                <Input
+                  type="number"
+                  value={tripExpenses.toll}
+                  onChange={(e) => setTripExpenses(prev => ({ ...prev, toll: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label>Other Expenses (₹)</Label>
+                <Input
+                  type="number"
+                  value={tripExpenses.other}
+                  onChange={(e) => setTripExpenses(prev => ({ ...prev, other: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted border">
+              <div className="flex justify-between text-sm">
+                <span>Total Expenses:</span>
+                <span className="text-destructive font-medium">
+                  {formatCurrency(tripExpenses.fuel + tripExpenses.toll + tripExpenses.other)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span>Net Profit:</span>
+                <span className={`font-bold ${(selectedTrip?.fare_amount || 0) - (tripExpenses.fuel + tripExpenses.toll + tripExpenses.other) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency((selectedTrip?.fare_amount || 0) - (tripExpenses.fuel + tripExpenses.toll + tripExpenses.other))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompleteDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCompleteTrip} disabled={completingTrip} className="bg-success hover:bg-success/90">
+              {completingTrip ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Completing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Complete Journey
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -291,6 +505,9 @@ export default function Trips() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold">{trip.trip_number}</h3>
                         <Badge className={getStatusColor(trip.status)}>{trip.status}</Badge>
+                        {trip.distance_km && (
+                          <Badge variant="outline" className="text-xs">{trip.distance_km} km</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                         <MapPin className="w-3 h-3" />
@@ -306,26 +523,32 @@ export default function Trips() {
                       </p>
                     </div>
                     <div className="flex gap-1 flex-wrap">
-                      <Button size="sm" variant="outline" onClick={() => generateInvoice(trip.id)} disabled={generatingInvoice === trip.id}>
+                      <Button size="sm" variant="outline" onClick={() => generateInvoice(trip.id)} disabled={generatingInvoice === trip.id} title="Generate Invoice">
                         {generatingInvoice === trip.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setSelectedTrip(trip); setMapOpen(true); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setSelectedTrip(trip); setMapOpen(true); }} title="View Map">
                         <Map className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => openEditDialog(trip)}>
+                      <Button size="sm" variant="outline" onClick={() => openEditDialog(trip)} title="Edit">
                         <Edit className="w-4 h-4" />
                       </Button>
                       {trip.status === "created" && (
-                        <Button size="sm" variant="outline" onClick={() => updateTrip.mutate({ id: trip.id, status: "running" })}>
+                        <Button size="sm" variant="outline" onClick={() => updateTrip.mutate({ id: trip.id, status: "running" })} title="Start Trip">
                           <Play className="w-4 h-4" />
                         </Button>
                       )}
                       {trip.status === "running" && (
-                        <Button size="sm" variant="outline" onClick={() => updateTrip.mutate({ id: trip.id, status: "completed" })}>
-                          <CheckCircle className="w-4 h-4" />
+                        <Button 
+                          size="sm" 
+                          className="bg-success hover:bg-success/90 text-success-foreground"
+                          onClick={() => openCompleteDialog(trip)} 
+                          title="Complete Journey"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Complete
                         </Button>
                       )}
-                      <Button size="sm" variant="destructive" onClick={() => deleteTrip.mutate(trip.id)}>
+                      <Button size="sm" variant="destructive" onClick={() => deleteTrip.mutate(trip.id)} title="Delete">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
